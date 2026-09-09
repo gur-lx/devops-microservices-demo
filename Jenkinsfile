@@ -4,7 +4,7 @@ pipeline {
     environment {
         REGISTRY        = 'docker.io/yourdockerhubusername'   // change me
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        SERVICES        = 'api-gateway user-service product-service'
+        SERVICES        = 'frontend api-gateway user-service product-service'
         DEPLOY_HOST     = 'deploy-server'                       // SSH host alias, see GUIDE.md
         DEPLOY_USER     = 'deployer'
         DEPLOY_PATH     = '/opt/devops-microservices-demo'

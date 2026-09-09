@@ -1,8 +1,9 @@
 # DevOps CI/CD Training: Two-Server Jenkins → Docker Deployment
 
-This repo is a working demo: 3 microservices (`api-gateway`, `user-service`,
-`product-service`) each in their own Docker container, wired together with
-Docker Compose, built and deployed by Jenkins.
+This repo is a working demo: a `frontend` dashboard plus 3 backend
+microservices (`api-gateway`, `user-service`, `product-service`), each in its
+own Docker container, wired together with Docker Compose, built and deployed
+by Jenkins.
 
 Architecture:
 
@@ -14,10 +15,16 @@ Architecture:
                         3. docker push -> registry ───►  4. docker compose pull
                                                           5. docker compose up -d
                                                                  │
-                                                     api-gateway :8080
+                                                        frontend :80  (public)
+                                                                 │
+                                                     api-gateway :8080 (internal)
                                                         │      │
                                               user-service  product-service
 ```
+
+The `frontend` container is the only public entry point (port 80). It serves
+the dashboard UI and reverse-proxies `/api/*` requests to `api-gateway` over
+the internal Docker network — `api-gateway` itself is not exposed on the host.
 
 ---
 
@@ -36,6 +43,11 @@ $5/mo droplet each). Nothing here is cloud-specific.
 ---
 
 ## 1. Server B first: prepare the deployment target
+
+Open inbound port **80** (HTTP) on Server B's security group/firewall — that's
+the `frontend` container, the only public entry point. Port 22 (SSH) for you
+and Jenkins is the only other inbound port needed; `api-gateway` and the
+backend services stay internal to the Docker network and don't need a rule.
 
 SSH into Server B and install Docker:
 
@@ -156,9 +168,10 @@ Sanity-check the app itself runs correctly with plain Docker Compose:
 ```bash
 cd devops-microservices-demo
 docker compose up --build
-curl http://localhost:8080/health
-curl http://localhost:8080/api/users
-curl http://localhost:8080/api/products
+open http://localhost   # or just curl it:
+curl http://localhost/gateway-health
+curl http://localhost/api/users
+curl http://localhost/api/products
 ```
 
 ---
