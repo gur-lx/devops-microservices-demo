@@ -15,14 +15,14 @@ Architecture:
                         3. docker push -> registry ───►  4. docker compose pull
                                                           5. docker compose up -d
                                                                  │
-                                                        frontend :80  (public)
+                                                        frontend :8090  (public)
                                                                  │
                                                      api-gateway :8080 (internal)
                                                         │      │
                                               user-service  product-service
 ```
 
-The `frontend` container is the only public entry point (port 80). It serves
+The `frontend` container is the only public entry point (port 8090). It serves
 the dashboard UI and reverse-proxies `/api/*` requests to `api-gateway` over
 the internal Docker network — `api-gateway` itself is not exposed on the host.
 
@@ -44,7 +44,7 @@ $5/mo droplet each). Nothing here is cloud-specific.
 
 ## 1. Server B first: prepare the deployment target
 
-Open inbound port **80** (HTTP) on Server B's security group/firewall — that's
+Open inbound port **8090** on Server B's security group/firewall — that's
 the `frontend` container, the only public entry point. Port 22 (SSH) for you
 and Jenkins is the only other inbound port needed; `api-gateway` and the
 backend services stay internal to the Docker network and don't need a rule.
@@ -168,10 +168,10 @@ Sanity-check the app itself runs correctly with plain Docker Compose:
 ```bash
 cd devops-microservices-demo
 docker compose up --build
-open http://localhost   # or just curl it:
-curl http://localhost/gateway-health
-curl http://localhost/api/users
-curl http://localhost/api/products
+open http://localhost:8090   # or just curl it:
+curl http://localhost:8090/gateway-health
+curl http://localhost:8090/api/users
+curl http://localhost:8090/api/products
 ```
 
 ---
