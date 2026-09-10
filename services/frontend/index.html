@@ -153,6 +153,47 @@
     </div>
   </section>
 
+  <section class="panel console-panel">
+    <h2><span class="section-icon">&#128421;</span> API Console &mdash; send a live request</h2>
+
+    <div class="flow-diagram" id="flow-diagram">
+      <div class="flow-node" data-node="browser">
+        <span class="flow-icon">&#127760;</span>
+        <span class="flow-label">Browser</span>
+      </div>
+      <div class="flow-arrow" data-arrow="browser-frontend"></div>
+      <div class="flow-node" data-node="frontend">
+        <span class="flow-label">Frontend</span>
+        <span class="flow-sub">nginx :8090</span>
+      </div>
+      <div class="flow-arrow" data-arrow="frontend-gateway"></div>
+      <div class="flow-node" data-node="gateway">
+        <span class="flow-label">API Gateway</span>
+        <span class="flow-sub">:8080</span>
+      </div>
+      <div class="flow-arrow" data-arrow="gateway-target"></div>
+      <div class="flow-node" data-node="target" id="flow-target">
+        <span class="flow-label" id="flow-target-label">Service</span>
+        <span class="flow-sub" id="flow-target-sub">&mdash;</span>
+      </div>
+    </div>
+
+    <div class="console-controls">
+      <button class="api-btn" data-method="GET" data-path="/api/users" data-target="user-service" data-target-port=":3001">GET /api/users</button>
+      <button class="api-btn" data-method="GET" data-path="/api/products" data-target="product-service" data-target-port=":3002">GET /api/products</button>
+      <button class="api-btn" data-method="GET" data-path="/gateway-health" data-target="api-gateway" data-target-port=":8080" data-skip-gateway-hop="true">GET /gateway-health</button>
+
+      <form id="add-user-form" class="inline-form">
+        <input id="new-user-name" type="text" placeholder="new user name&hellip;" maxlength="40" required />
+        <button type="submit" class="api-btn api-btn-accent">POST /api/users</button>
+      </form>
+    </div>
+
+    <div class="console-log" id="console-log">
+      <div class="log-line log-hint">$ click a button above to send a real request through the pipeline&hellip;</div>
+    </div>
+  </section>
+
   <section class="data-columns">
     <div class="panel">
       <h2><span class="section-icon">&#128101;</span> Users <span class="pill" id="users-count">&mdash;</span></h2>

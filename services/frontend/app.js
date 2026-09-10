@@ -60,6 +60,172 @@ async function loadProducts() {
   }
 }
 
+// ---- API Console: fires a real request and animates it hop by hop ----
+
+const HOP_DELAY_MS = 220;
+
+const flowNodes = {
+  browser: document.querySelector('.flow-node[data-node="browser"]'),
+  frontend: document.querySelector('.flow-node[data-node="frontend"]'),
+  gateway: document.querySelector('.flow-node[data-node="gateway"]'),
+  target: document.querySelector('.flow-node[data-node="target"]'),
+};
+const flowArrows = {
+  'browser-frontend': document.querySelector('.flow-arrow[data-arrow="browser-frontend"]'),
+  'frontend-gateway': document.querySelector('.flow-arrow[data-arrow="frontend-gateway"]'),
+  'gateway-target': document.querySelector('.flow-arrow[data-arrow="gateway-target"]'),
+};
+const flowTargetLabel = document.getElementById('flow-target-label');
+const flowTargetSub = document.getElementById('flow-target-sub');
+const consoleLog = document.getElementById('console-log');
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function clearFlowClasses() {
+  Object.values(flowNodes).forEach(n => n.classList.remove('hop-active', 'hop-response', 'hop-error'));
+  Object.values(flowArrows).forEach(a => a.classList.remove('hop-active', 'hop-response', 'hop-error'));
+}
+
+function log(text, cls) {
+  const line = document.createElement('div');
+  line.className = `log-line ${cls || ''}`;
+  const time = new Date().toLocaleTimeString();
+  line.textContent = `[${time}] ${text}`;
+  consoleLog.appendChild(line);
+  while (consoleLog.children.length > 40) {
+    consoleLog.removeChild(consoleLog.firstChild);
+  }
+}
+
+async function animateForward(skipGatewayHop) {
+  clearFlowClasses();
+  flowNodes.browser.classList.add('hop-active');
+  await sleep(HOP_DELAY_MS);
+
+  flowNodes.browser.classList.remove('hop-active');
+  flowArrows['browser-frontend'].classList.add('hop-active');
+  flowNodes.frontend.classList.add('hop-active');
+  await sleep(HOP_DELAY_MS);
+
+  if (skipGatewayHop) {
+    flowArrows['frontend-gateway'].classList.add('hop-active');
+    flowNodes.gateway.classList.add('hop-active');
+    return;
+  }
+
+  flowArrows['frontend-gateway'].classList.add('hop-active');
+  flowNodes.gateway.classList.add('hop-active');
+  await sleep(HOP_DELAY_MS);
+
+  flowArrows['gateway-target'].classList.add('hop-active');
+  flowNodes.target.classList.add('hop-active');
+}
+
+async function animateReturn(ok, skipGatewayHop) {
+  const cls = ok ? 'hop-response' : 'hop-error';
+  clearFlowClasses();
+  flowNodes.target.classList.add(cls);
+  flowArrows['gateway-target'].classList.add(cls);
+  await sleep(HOP_DELAY_MS);
+
+  if (!skipGatewayHop) {
+    flowNodes.gateway.classList.add(cls);
+    flowArrows['frontend-gateway'].classList.add(cls);
+    await sleep(HOP_DELAY_MS);
+  }
+
+  flowNodes.frontend.classList.add(cls);
+  flowArrows['browser-frontend'].classList.add(cls);
+  await sleep(HOP_DELAY_MS);
+
+  flowNodes.browser.classList.add(cls);
+  await sleep(HOP_DELAY_MS);
+  clearFlowClasses();
+}
+
+let requestInFlight = false;
+
+async function sendApiRequest({ method, path, target, targetPort, skipGatewayHop, body }) {
+  if (requestInFlight) return;
+  requestInFlight = true;
+  document.querySelectorAll('.api-btn').forEach(b => (b.disabled = true));
+
+  flowTargetLabel.textContent = target;
+  flowTargetSub.textContent = targetPort || '';
+
+  log(`→ dispatching ${method} ${path}`, 'log-req');
+  const started = performance.now();
+
+  const forward = animateForward(skipGatewayHop);
+
+  let ok = false;
+  let statusText = '';
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
+    });
+    const elapsed = Math.round(performance.now() - started);
+    await forward;
+    ok = res.ok;
+    statusText = `${res.status} ${res.statusText}`;
+    const data = await res.json().catch(() => null);
+
+    if (ok) {
+      log(`← ${target} responded ${statusText} (${elapsed}ms)`, 'log-ok');
+      if (Array.isArray(data)) {
+        log(`  payload: ${data.length} record(s)`, 'log-dim');
+      } else if (data && typeof data === 'object') {
+        log(`  payload: ${JSON.stringify(data)}`, 'log-dim');
+      }
+    } else {
+      log(`← ${target} responded ${statusText} (${elapsed}ms)`, 'log-err');
+    }
+    await animateReturn(ok, skipGatewayHop);
+  } catch (err) {
+    await forward;
+    log(`✕ request failed — ${target} unreachable`, 'log-err');
+    await animateReturn(false, skipGatewayHop);
+  }
+
+  requestInFlight = false;
+  document.querySelectorAll('.api-btn').forEach(b => (b.disabled = false));
+
+  loadUsers();
+  loadProducts();
+}
+
+document.querySelectorAll('.api-btn[data-path]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sendApiRequest({
+      method: btn.dataset.method,
+      path: btn.dataset.path,
+      target: btn.dataset.target,
+      targetPort: btn.dataset.targetPort,
+      skipGatewayHop: btn.dataset.skipGatewayHop === 'true',
+    });
+  });
+});
+
+document.getElementById('add-user-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('new-user-name');
+  const name = input.value.trim();
+  if (!name) return;
+  sendApiRequest({
+    method: 'POST',
+    path: '/api/users',
+    target: 'user-service',
+    targetPort: ':3001',
+    body: { name },
+  });
+  input.value = '';
+});
+
 pollHealth();
 loadUsers();
 loadProducts();

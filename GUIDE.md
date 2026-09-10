@@ -5,6 +5,13 @@ microservices (`api-gateway`, `user-service`, `product-service`), each in its
 own Docker container, wired together with Docker Compose, built and deployed
 by Jenkins.
 
+The dashboard includes a live **API Console**: buttons that fire real
+`GET`/`POST` requests at the running services, an animated diagram showing
+the request hop through `browser → frontend → api-gateway → service` and
+back, and a terminal-style log of each request/response with real latency.
+Useful for demoing that the microservices are actually talking to each other
+over the network, not just serving static data.
+
 Architecture:
 
 ```
