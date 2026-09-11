@@ -47,6 +47,11 @@ If you're just training and don't have 2 real servers yet, you can do all of
 this with 2 local VMs (VirtualBox/Multipass) or 2 cheap cloud VMs (e.g. one
 $5/mo droplet each). Nothing here is cloud-specific.
 
+**Already have Ansible wired up between your two servers?** Skip the manual
+steps in sections 1–2 below and use [ansible/README.md](ansible/README.md)
+instead — it automates the same Docker + Jenkins + deploy-user setup as
+playbooks, then continue from section 3 (Jenkins pipeline job + webhook).
+
 ---
 
 ## 1. Server B first: prepare the deployment target

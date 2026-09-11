@@ -1,0 +1,77 @@
+---
+# Runs on the head node (Jenkins server / Ansible control node itself).
+- hosts: jenkins_server
+  become: true
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - curl
+          - ca-certificates
+        state: present
+        update_cache: true
+
+    - name: Check if Docker is already installed
+      command: which docker
+      register: docker_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install Docker via get.docker.com
+      shell: curl -fsSL https://get.docker.com | sh
+      when: docker_check.rc != 0
+
+    - name: Create the jenkins_home volume
+      command: docker volume create {{ jenkins_home_volume }}
+      register: volume_create
+      changed_when: "'already exists' not in volume_create.stderr | default('')"
+
+    - name: Check if the jenkins container already exists
+      command: docker inspect jenkins
+      register: jenkins_inspect
+      changed_when: false
+      failed_when: false
+
+    - name: Run the Jenkins container
+      command: >
+        docker run -d --name jenkins
+        -p {{ jenkins_ui_port }}:8080 -p 50000:50000
+        -v {{ jenkins_home_volume }}:/var/jenkins_home
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v $(which docker):/usr/bin/docker
+        --restart unless-stopped
+        jenkins/jenkins:lts
+      when: jenkins_inspect.rc != 0
+
+    - name: Ensure the directory for the deploy keypair exists
+      file:
+        path: /var/lib/jenkins_ssh
+        state: directory
+        mode: "0700"
+
+    - name: Generate the SSH keypair Jenkins will use to reach the deploy server
+      command: ssh-keygen -t ed25519 -f /var/lib/jenkins_ssh/jenkins_deploy_key -N ""
+      args:
+        creates: /var/lib/jenkins_ssh/jenkins_deploy_key
+
+    - name: Fetch the public key back to the control machine (for playbook-deploy-server.yml)
+      fetch:
+        src: /var/lib/jenkins_ssh/jenkins_deploy_key.pub
+        dest: files/jenkins_deploy_key.pub
+        flat: true
+
+    - name: Show the Jenkins initial admin password (first run only)
+      command: docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+      register: admin_password
+      changed_when: false
+      failed_when: false
+
+    - name: Print setup info
+      debug:
+        msg: >-
+          Jenkins is up at http://<head-public-ip>:{{ jenkins_ui_port }}.
+          Initial admin password:
+          {{ admin_password.stdout | default('already unlocked / not found — check docker logs jenkins') }}

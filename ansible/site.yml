@@ -1,0 +1,8 @@
+---
+# Order matters: playbook-jenkins.yml generates the SSH keypair and fetches
+# its public half to ./files/jenkins_deploy_key.pub on the control node;
+# playbook-deploy-server.yml then reads that file to authorize the key on
+# the deploy server. Run this file, or run the two playbooks separately in
+# this order.
+- import_playbook: playbook-jenkins.yml
+- import_playbook: playbook-deploy-server.yml
