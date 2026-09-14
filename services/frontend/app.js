@@ -3,7 +3,33 @@ const HEALTH_ENDPOINTS = {
   'api-gateway': '/gateway-health',
   'user-service': '/api/health/user-service',
   'product-service': '/api/health/product-service',
+  'order-service': '/api/health/order-service',
+  'cart-service': '/api/health/cart-service',
+  'inventory-service': '/api/health/inventory-service',
+  'payment-service': '/api/health/payment-service',
+  'notification-service': '/api/health/notification-service',
+  'review-service': '/api/health/review-service',
+  'auth-service': '/api/health/auth-service',
+  'shipping-service': '/api/health/shipping-service',
+  'search-service': '/api/health/search-service',
+  'analytics-service': '/api/health/analytics-service',
 };
+
+function buildHealthGrid() {
+  const grid = document.getElementById('health-grid');
+  grid.innerHTML = Object.keys(HEALTH_ENDPOINTS).map(service => `
+    <div class="health-card" data-service="${service}">
+      <div class="health-top">
+        <span class="dot dot-pending"></span>
+        <span class="health-name">${service}</span>
+      </div>
+      <div class="health-meta">
+        <span class="latency">&mdash;</span>
+        <span class="status-text">checking&hellip;</span>
+      </div>
+    </div>
+  `).join('');
+}
 
 async function checkHealth(service, path) {
   const card = document.querySelector(`.health-card[data-service="${service}"]`);
@@ -57,6 +83,47 @@ async function loadProducts() {
     body.innerHTML = products.map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>$${p.price.toFixed(2)}</td></tr>`).join('');
   } catch (err) {
     body.innerHTML = '<tr><td colspan="3" class="empty-row">could not reach product-service</td></tr>';
+  }
+}
+
+async function loadOrders() {
+  const body = document.getElementById('orders-body');
+  const count = document.getElementById('orders-count');
+  try {
+    const res = await fetch('/api/orders', { cache: 'no-store' });
+    const orders = await res.json();
+    count.textContent = orders.length;
+    body.innerHTML = orders.map(o => `<tr><td>${o.id}</td><td>${o.product}</td><td>${o.quantity}</td><td>${o.status}</td></tr>`).join('');
+  } catch (err) {
+    body.innerHTML = '<tr><td colspan="4" class="empty-row">could not reach order-service</td></tr>';
+  }
+}
+
+async function loadInventory() {
+  const body = document.getElementById('inventory-body');
+  const count = document.getElementById('inventory-count');
+  try {
+    const res = await fetch('/api/inventory', { cache: 'no-store' });
+    const inventory = await res.json();
+    count.textContent = inventory.length;
+    body.innerHTML = inventory.map(i => `<tr><td>${i.id}</td><td>${i.product}</td><td>${i.stock}</td></tr>`).join('');
+  } catch (err) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-row">could not reach inventory-service</td></tr>';
+  }
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats', { cache: 'no-store' });
+    const stats = await res.json();
+    document.getElementById('stat-users').textContent = stats.totalUsers;
+    document.getElementById('stat-orders').textContent = stats.totalOrders;
+    document.getElementById('stat-revenue').textContent = `$${stats.totalRevenue.toFixed(2)}`;
+    document.getElementById('stat-uptime').textContent = `${stats.uptimeSeconds}s`;
+  } catch (err) {
+    ['stat-users', 'stat-orders', 'stat-revenue', 'stat-uptime'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
   }
 }
 
@@ -197,6 +264,9 @@ async function sendApiRequest({ method, path, target, targetPort, skipGatewayHop
 
   loadUsers();
   loadProducts();
+  loadOrders();
+  loadInventory();
+  loadStats();
 }
 
 document.querySelectorAll('.api-btn[data-path]').forEach(btn => {
@@ -226,7 +296,27 @@ document.getElementById('add-user-form').addEventListener('submit', (e) => {
   input.value = '';
 });
 
+document.getElementById('add-order-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('new-order-product');
+  const product = input.value.trim();
+  if (!product) return;
+  sendApiRequest({
+    method: 'POST',
+    path: '/api/orders',
+    target: 'order-service',
+    targetPort: ':3003',
+    body: { userId: 1, product, quantity: 1 },
+  });
+  input.value = '';
+});
+
+buildHealthGrid();
 pollHealth();
 loadUsers();
 loadProducts();
+loadOrders();
+loadInventory();
+loadStats();
 setInterval(pollHealth, 8000);
+setInterval(loadStats, 8000);

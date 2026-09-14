@@ -4,10 +4,12 @@ pipeline {
     environment {
         REGISTRY        = 'docker.io/yourdockerhubusername'   // change me
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
-        SERVICES        = 'frontend api-gateway user-service product-service'
+        SERVICES        = 'frontend api-gateway user-service product-service order-service cart-service inventory-service payment-service notification-service review-service auth-service shipping-service search-service analytics-service'
         DEPLOY_HOST     = 'deploy-server'                       // SSH host alias, see GUIDE.md
         DEPLOY_USER     = 'deployer'
         DEPLOY_PATH     = '/opt/devops-microservices-demo'
+        DOMAIN            = 'learning.run.place'
+        LETSENCRYPT_EMAIL = 'you@example.com'                   // change me -- used by acme-companion for cert notices
     }
 
     options {
@@ -60,6 +62,8 @@ pipeline {
                             cd ${DEPLOY_PATH} && \
                             export REGISTRY=${REGISTRY} && \
                             export IMAGE_TAG=${IMAGE_TAG} && \
+                            export DOMAIN=${DOMAIN} && \
+                            export LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL} && \
                             docker compose pull && \
                             docker compose up -d --remove-orphans && \
                             docker image prune -f \

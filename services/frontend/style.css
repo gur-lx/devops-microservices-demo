@@ -83,6 +83,13 @@ header.topbar {
   color: var(--text-dim);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .pipeline-chip {
   font-family: var(--mono);
   font-size: 0.82rem;
@@ -94,6 +101,18 @@ header.topbar {
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   background: var(--panel);
+}
+
+.pipeline-chip-link {
+  text-decoration: none;
+  color: var(--accent);
+  border-color: rgba(34,211,238,0.3);
+  background: rgba(34,211,238,0.08);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.pipeline-chip-link:hover {
+  border-color: var(--accent);
+  background: rgba(34,211,238,0.16);
 }
 
 .dot {
@@ -172,6 +191,8 @@ main {
 .arch-svg .node-registry rect { stroke: var(--accent); fill: rgba(34,211,238,0.1); }
 .arch-svg .node-live rect { stroke: var(--good); fill: rgba(52,211,153,0.08); }
 .arch-svg .node-server rect { stroke-dasharray: 4 3; fill: transparent; }
+.arch-svg .node-mesh rect { stroke-dasharray: 5 4; fill: rgba(255,255,255,0.015); stroke: var(--panel-border); }
+.arch-svg .node-svc rect { stroke: var(--good); fill: rgba(52,211,153,0.06); }
 
 .arch-svg text {
   fill: var(--text);
@@ -183,6 +204,16 @@ main {
 .arch-svg .node-title-sm { font-size: 11px; font-weight: 700; }
 .arch-svg .node-sub { font-size: 9.5px; fill: var(--text-dim); }
 .arch-svg .node-sub-dim { fill: var(--accent-2); }
+.arch-svg .node-chip-name { font-size: 9.5px; font-weight: 700; text-anchor: middle; }
+.arch-svg .node-chip-port { font-size: 8px; font-weight: 400; fill: var(--text-dim); text-anchor: middle; }
+.arch-svg .node-mesh-label {
+  text-anchor: start;
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--text-dim);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
 
 .arch-svg .flow-line, .arch-svg .flow-line-inline {
   stroke: var(--text-dim);
@@ -415,6 +446,37 @@ main {
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 0.8rem;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.stat-tile {
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-value {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .badge-row {

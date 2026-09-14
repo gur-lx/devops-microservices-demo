@@ -21,8 +21,13 @@
       <p class="tagline">CI/CD Training Project &mdash; Jenkins &middot; Docker &middot; Node.js Microservices</p>
     </div>
   </div>
-  <div class="pipeline-chip">
-    <span class="dot dot-live"></span> Live cluster view
+  <div class="topbar-actions">
+    <a class="pipeline-chip pipeline-chip-link" href="/api-docs" target="_blank" rel="noopener">
+      <span class="section-icon">&#128220;</span> API Docs (Swagger)
+    </a>
+    <div class="pipeline-chip">
+      <span class="dot dot-live"></span> Live cluster view
+    </div>
   </div>
 </header>
 
@@ -31,11 +36,23 @@
   <section class="panel architecture-panel">
     <h2><span class="section-icon">&#9881;</span> System Architecture</h2>
     <div class="diagram-wrap">
-      <svg viewBox="0 0 980 260" xmlns="http://www.w3.org/2000/svg" class="arch-svg" role="img" aria-label="Architecture diagram: developer pushes to GitHub, Jenkins builds and pushes images, deploy server runs frontend, api gateway, user service and product service">
+      <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" class="arch-svg" role="img" aria-label="Architecture diagram: developer pushes to GitHub, Jenkins builds and pushes images, deploy server routes frontend and API gateway traffic into a mesh of twelve backend microservices">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"></path>
           </marker>
+          <clipPath id="clip-svc-1"><rect x="35" y="335" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-2"><rect x="193" y="335" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-3"><rect x="351" y="335" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-4"><rect x="509" y="335" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-5"><rect x="667" y="335" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-6"><rect x="825" y="335" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-7"><rect x="35" y="373" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-8"><rect x="193" y="373" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-9"><rect x="351" y="373" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-10"><rect x="509" y="373" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-11"><rect x="667" y="373" width="148" height="34" rx="8"></rect></clipPath>
+          <clipPath id="clip-svc-12"><rect x="825" y="373" width="148" height="34" rx="8"></rect></clipPath>
         </defs>
 
         <line x1="90" y1="55" x2="185" y2="55" class="flow-line" marker-end="url(#arrow)"></line>
@@ -45,8 +62,7 @@
 
         <line x1="620" y1="185" x2="620" y2="230" class="flow-line" marker-end="url(#arrow)"></line>
         <line x1="620" y1="230" x2="510" y2="230" class="flow-line" marker-end="url(#arrow)"></line>
-        <line x1="620" y1="230" x2="730" y2="230" class="flow-line" marker-end="url(#arrow)"></line>
-        <line x1="730" y1="230" x2="880" y2="230" class="flow-line" marker-end="url(#arrow)"></line>
+        <line x1="620" y1="280" x2="620" y2="300" class="flow-line" marker-end="url(#arrow)"></line>
 
         <line x1="440" y1="230" x2="510" y2="230" class="flow-line-inline"></line>
 
@@ -92,16 +108,82 @@
           <text x="620" y="242" class="node-sub">:8080</text>
         </g>
 
-        <g class="node node-live node-user">
-          <rect x="670" y="205" width="120" height="50" rx="10"></rect>
-          <text x="730" y="228" class="node-title-sm">User Service</text>
-          <text x="730" y="242" class="node-sub">:3001</text>
+        <g class="node node-mesh">
+          <rect x="20" y="300" width="960" height="105" rx="14"></rect>
+          <text x="50" y="322" class="node-mesh-label">12&#215; backend microservices</text>
         </g>
 
-        <g class="node node-live node-product">
-          <rect x="820" y="205" width="130" height="50" rx="10"></rect>
-          <text x="885" y="228" class="node-title-sm">Product Service</text>
-          <text x="885" y="242" class="node-sub">:3002</text>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-1)">
+          <title>user-service :3001</title>
+          <rect x="35" y="335" width="148" height="34" rx="8"></rect>
+          <text x="109" y="347" class="node-chip-name">user-service</text>
+          <text x="109" y="360" class="node-chip-port">:3001</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-2)">
+          <title>product-service :3002</title>
+          <rect x="193" y="335" width="148" height="34" rx="8"></rect>
+          <text x="267" y="347" class="node-chip-name">product-service</text>
+          <text x="267" y="360" class="node-chip-port">:3002</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-3)">
+          <title>order-service :3003</title>
+          <rect x="351" y="335" width="148" height="34" rx="8"></rect>
+          <text x="425" y="347" class="node-chip-name">order-service</text>
+          <text x="425" y="360" class="node-chip-port">:3003</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-4)">
+          <title>cart-service :3004</title>
+          <rect x="509" y="335" width="148" height="34" rx="8"></rect>
+          <text x="583" y="347" class="node-chip-name">cart-service</text>
+          <text x="583" y="360" class="node-chip-port">:3004</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-5)">
+          <title>inventory-service :3005</title>
+          <rect x="667" y="335" width="148" height="34" rx="8"></rect>
+          <text x="741" y="347" class="node-chip-name">inventory-service</text>
+          <text x="741" y="360" class="node-chip-port">:3005</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-6)">
+          <title>payment-service :3006</title>
+          <rect x="825" y="335" width="148" height="34" rx="8"></rect>
+          <text x="899" y="347" class="node-chip-name">payment-service</text>
+          <text x="899" y="360" class="node-chip-port">:3006</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-7)">
+          <title>notification-service :3007</title>
+          <rect x="35" y="373" width="148" height="34" rx="8"></rect>
+          <text x="109" y="385" class="node-chip-name">notification-svc</text>
+          <text x="109" y="398" class="node-chip-port">:3007</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-8)">
+          <title>review-service :3008</title>
+          <rect x="193" y="373" width="148" height="34" rx="8"></rect>
+          <text x="267" y="385" class="node-chip-name">review-service</text>
+          <text x="267" y="398" class="node-chip-port">:3008</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-9)">
+          <title>auth-service :3009</title>
+          <rect x="351" y="373" width="148" height="34" rx="8"></rect>
+          <text x="425" y="385" class="node-chip-name">auth-service</text>
+          <text x="425" y="398" class="node-chip-port">:3009</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-10)">
+          <title>shipping-service :3010</title>
+          <rect x="509" y="373" width="148" height="34" rx="8"></rect>
+          <text x="583" y="385" class="node-chip-name">shipping-service</text>
+          <text x="583" y="398" class="node-chip-port">:3010</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-11)">
+          <title>search-service :3011</title>
+          <rect x="667" y="373" width="148" height="34" rx="8"></rect>
+          <text x="741" y="385" class="node-chip-name">search-service</text>
+          <text x="741" y="398" class="node-chip-port">:3011</text>
+        </g>
+        <g class="node node-live node-svc" clip-path="url(#clip-svc-12)">
+          <title>analytics-service :3012</title>
+          <rect x="825" y="373" width="148" height="34" rx="8"></rect>
+          <text x="899" y="385" class="node-chip-name">analytics-service</text>
+          <text x="899" y="398" class="node-chip-port">:3012</text>
         </g>
       </svg>
     </div>
@@ -109,48 +191,7 @@
 
   <section class="panel">
     <h2><span class="section-icon">&#9889;</span> Live Service Health</h2>
-    <div class="health-grid" id="health-grid">
-      <div class="health-card" data-service="frontend">
-        <div class="health-top">
-          <span class="dot dot-pending"></span>
-          <span class="health-name">frontend</span>
-        </div>
-        <div class="health-meta">
-          <span class="latency">&mdash;</span>
-          <span class="status-text">checking&hellip;</span>
-        </div>
-      </div>
-      <div class="health-card" data-service="api-gateway">
-        <div class="health-top">
-          <span class="dot dot-pending"></span>
-          <span class="health-name">api-gateway</span>
-        </div>
-        <div class="health-meta">
-          <span class="latency">&mdash;</span>
-          <span class="status-text">checking&hellip;</span>
-        </div>
-      </div>
-      <div class="health-card" data-service="user-service">
-        <div class="health-top">
-          <span class="dot dot-pending"></span>
-          <span class="health-name">user-service</span>
-        </div>
-        <div class="health-meta">
-          <span class="latency">&mdash;</span>
-          <span class="status-text">checking&hellip;</span>
-        </div>
-      </div>
-      <div class="health-card" data-service="product-service">
-        <div class="health-top">
-          <span class="dot dot-pending"></span>
-          <span class="health-name">product-service</span>
-        </div>
-        <div class="health-meta">
-          <span class="latency">&mdash;</span>
-          <span class="status-text">checking&hellip;</span>
-        </div>
-      </div>
-    </div>
+    <div class="health-grid" id="health-grid"></div>
   </section>
 
   <section class="panel console-panel">
@@ -181,11 +222,24 @@
     <div class="console-controls">
       <button class="api-btn" data-method="GET" data-path="/api/users" data-target="user-service" data-target-port=":3001">GET /api/users</button>
       <button class="api-btn" data-method="GET" data-path="/api/products" data-target="product-service" data-target-port=":3002">GET /api/products</button>
+      <button class="api-btn" data-method="GET" data-path="/api/orders" data-target="order-service" data-target-port=":3003">GET /api/orders</button>
+      <button class="api-btn" data-method="GET" data-path="/api/cart" data-target="cart-service" data-target-port=":3004">GET /api/cart</button>
+      <button class="api-btn" data-method="GET" data-path="/api/inventory" data-target="inventory-service" data-target-port=":3005">GET /api/inventory</button>
+      <button class="api-btn" data-method="GET" data-path="/api/payments" data-target="payment-service" data-target-port=":3006">GET /api/payments</button>
+      <button class="api-btn" data-method="GET" data-path="/api/reviews" data-target="review-service" data-target-port=":3008">GET /api/reviews</button>
+      <button class="api-btn" data-method="GET" data-path="/api/shipments" data-target="shipping-service" data-target-port=":3010">GET /api/shipments</button>
+      <button class="api-btn" data-method="GET" data-path="/api/search?q=mouse" data-target="search-service" data-target-port=":3011">GET /api/search?q=mouse</button>
+      <button class="api-btn" data-method="GET" data-path="/api/stats" data-target="analytics-service" data-target-port=":3012">GET /api/stats</button>
       <button class="api-btn" data-method="GET" data-path="/gateway-health" data-target="api-gateway" data-target-port=":8080" data-skip-gateway-hop="true">GET /gateway-health</button>
 
       <form id="add-user-form" class="inline-form">
         <input id="new-user-name" type="text" placeholder="new user name&hellip;" maxlength="40" required />
         <button type="submit" class="api-btn api-btn-accent">POST /api/users</button>
+      </form>
+
+      <form id="add-order-form" class="inline-form">
+        <input id="new-order-product" type="text" placeholder="new order product&hellip;" maxlength="40" required />
+        <button type="submit" class="api-btn api-btn-accent">POST /api/orders</button>
       </form>
     </div>
 
@@ -210,6 +264,32 @@
         <tbody id="products-body"><tr><td colspan="3" class="loading-row">loading&hellip;</td></tr></tbody>
       </table>
     </div>
+
+    <div class="panel">
+      <h2><span class="section-icon">&#128230;</span> Orders <span class="pill" id="orders-count">&mdash;</span></h2>
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Product</th><th>Qty</th><th>Status</th></tr></thead>
+        <tbody id="orders-body"><tr><td colspan="4" class="loading-row">loading&hellip;</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2><span class="section-icon">&#128202;</span> Inventory <span class="pill" id="inventory-count">&mdash;</span></h2>
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Product</th><th>Stock</th></tr></thead>
+        <tbody id="inventory-body"><tr><td colspan="3" class="loading-row">loading&hellip;</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel stats-panel">
+    <h2><span class="section-icon">&#128200;</span> Platform Analytics</h2>
+    <div class="stats-row" id="stats-row">
+      <div class="stat-tile"><span class="stat-value" id="stat-users">&mdash;</span><span class="stat-label">total users</span></div>
+      <div class="stat-tile"><span class="stat-value" id="stat-orders">&mdash;</span><span class="stat-label">total orders</span></div>
+      <div class="stat-tile"><span class="stat-value" id="stat-revenue">&mdash;</span><span class="stat-label">total revenue</span></div>
+      <div class="stat-tile"><span class="stat-value" id="stat-uptime">&mdash;</span><span class="stat-label">analytics uptime</span></div>
+    </div>
   </section>
 
   <section class="panel stack-panel">
@@ -223,6 +303,9 @@
       <span class="badge">Nginx</span>
       <span class="badge">GitHub Webhooks</span>
       <span class="badge">Microservices</span>
+      <span class="badge">API Gateway</span>
+      <span class="badge">14 Services</span>
+      <span class="badge">Swagger / OpenAPI 3</span>
     </div>
   </section>
 

@@ -16,9 +16,29 @@ services:
     environment:
       - USER_SERVICE_URL=http://user-service:3001
       - PRODUCT_SERVICE_URL=http://product-service:3002
+      - ORDER_SERVICE_URL=http://order-service:3003
+      - CART_SERVICE_URL=http://cart-service:3004
+      - INVENTORY_SERVICE_URL=http://inventory-service:3005
+      - PAYMENT_SERVICE_URL=http://payment-service:3006
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3007
+      - REVIEW_SERVICE_URL=http://review-service:3008
+      - AUTH_SERVICE_URL=http://auth-service:3009
+      - SHIPPING_SERVICE_URL=http://shipping-service:3010
+      - SEARCH_SERVICE_URL=http://search-service:3011
+      - ANALYTICS_SERVICE_URL=http://analytics-service:3012
     depends_on:
       - user-service
       - product-service
+      - order-service
+      - cart-service
+      - inventory-service
+      - payment-service
+      - notification-service
+      - review-service
+      - auth-service
+      - shipping-service
+      - search-service
+      - analytics-service
     networks:
       - app-net
 
@@ -29,6 +49,56 @@ services:
 
   product-service:
     build: ./services/product-service
+    networks:
+      - app-net
+
+  order-service:
+    build: ./services/order-service
+    networks:
+      - app-net
+
+  cart-service:
+    build: ./services/cart-service
+    networks:
+      - app-net
+
+  inventory-service:
+    build: ./services/inventory-service
+    networks:
+      - app-net
+
+  payment-service:
+    build: ./services/payment-service
+    networks:
+      - app-net
+
+  notification-service:
+    build: ./services/notification-service
+    networks:
+      - app-net
+
+  review-service:
+    build: ./services/review-service
+    networks:
+      - app-net
+
+  auth-service:
+    build: ./services/auth-service
+    networks:
+      - app-net
+
+  shipping-service:
+    build: ./services/shipping-service
+    networks:
+      - app-net
+
+  search-service:
+    build: ./services/search-service
+    networks:
+      - app-net
+
+  analytics-service:
+    build: ./services/analytics-service
     networks:
       - app-net
 

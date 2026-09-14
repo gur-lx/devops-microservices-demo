@@ -1,11 +1,53 @@
 # Production/deployment server: pulls prebuilt images from the registry
 # instead of building from source. This is what Jenkins copies over
 # and runs on the deployment server.
+#
+# TLS/domain: nginx-proxy + acme-companion sit in front of everything and
+# are driven entirely by the VIRTUAL_HOST / LETSENCRYPT_HOST labels on the
+# frontend service below -- no manual nginx.conf or certbot commands needed
+# on the host. Set DOMAIN and LETSENCRYPT_EMAIL as env vars before `up`,
+# e.g.: export DOMAIN=learning.run.place LETSENCRYPT_EMAIL=you@example.com
 services:
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  acme-companion:
+    image: nginxproxy/acme-companion:latest
+    depends_on:
+      - nginx-proxy
+    environment:
+      - DEFAULT_EMAIL=${LETSENCRYPT_EMAIL}
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+    volumes:
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - acme:/etc/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app-net
+    restart: unless-stopped
+
   frontend:
     image: ${REGISTRY}/frontend:${IMAGE_TAG:-latest}
-    ports:
-      - "8090:80"
+    expose:
+      - "80"
+    environment:
+      - VIRTUAL_HOST=${DOMAIN}
+      - VIRTUAL_PORT=80
+      - LETSENCRYPT_HOST=${DOMAIN}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
     depends_on:
       - api-gateway
     networks:
@@ -19,9 +61,29 @@ services:
     environment:
       - USER_SERVICE_URL=http://user-service:3001
       - PRODUCT_SERVICE_URL=http://product-service:3002
+      - ORDER_SERVICE_URL=http://order-service:3003
+      - CART_SERVICE_URL=http://cart-service:3004
+      - INVENTORY_SERVICE_URL=http://inventory-service:3005
+      - PAYMENT_SERVICE_URL=http://payment-service:3006
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3007
+      - REVIEW_SERVICE_URL=http://review-service:3008
+      - AUTH_SERVICE_URL=http://auth-service:3009
+      - SHIPPING_SERVICE_URL=http://shipping-service:3010
+      - SEARCH_SERVICE_URL=http://search-service:3011
+      - ANALYTICS_SERVICE_URL=http://analytics-service:3012
     depends_on:
       - user-service
       - product-service
+      - order-service
+      - cart-service
+      - inventory-service
+      - payment-service
+      - notification-service
+      - review-service
+      - auth-service
+      - shipping-service
+      - search-service
+      - analytics-service
     networks:
       - app-net
     restart: unless-stopped
@@ -38,6 +100,72 @@ services:
       - app-net
     restart: unless-stopped
 
+  order-service:
+    image: ${REGISTRY}/order-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  cart-service:
+    image: ${REGISTRY}/cart-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  inventory-service:
+    image: ${REGISTRY}/inventory-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  payment-service:
+    image: ${REGISTRY}/payment-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  notification-service:
+    image: ${REGISTRY}/notification-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  review-service:
+    image: ${REGISTRY}/review-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  auth-service:
+    image: ${REGISTRY}/auth-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  shipping-service:
+    image: ${REGISTRY}/shipping-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  search-service:
+    image: ${REGISTRY}/search-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  analytics-service:
+    image: ${REGISTRY}/analytics-service:${IMAGE_TAG:-latest}
+    networks:
+      - app-net
+    restart: unless-stopped
+
 networks:
   app-net:
     driver: bridge
+
+volumes:
+  certs:
+  vhost:
+  html:
+  acme:
