@@ -9,7 +9,7 @@ pipeline {
         DEPLOY_USER     = 'ubuntu'
         DEPLOY_PATH     = '/var/www/html/microservices-devops.app/devops-microservices-demo'
         DOMAIN            = 'microservices-devops.app'
-        LETSENCRYPT_EMAIL = 'you@example.com'                   // change me -- used by acme-companion for cert notices
+        LETSENCRYPT_EMAIL = 'gurpiyar656@gmail.com'
     }
 
     options {
