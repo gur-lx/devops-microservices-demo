@@ -8,12 +8,12 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://100.58.229.167:9090
+    url: http://184.193.151.24:9090
     isDefault: true
     editable: true
 
   - name: Loki
     type: loki
     access: proxy
-    url: http://100.58.229.167:3100
+    url: http://184.193.151.24:3100
     editable: true

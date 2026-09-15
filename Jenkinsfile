@@ -5,7 +5,7 @@ pipeline {
         REGISTRY        = 'docker.io/gurlx'
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
         SERVICES        = 'frontend api-gateway user-service product-service order-service cart-service inventory-service payment-service notification-service review-service auth-service shipping-service search-service analytics-service'
-        DEPLOY_HOST     = '100.58.229.167'
+        DEPLOY_HOST     = '184.193.151.24'
         DEPLOY_USER     = 'ubuntu'
         DEPLOY_PATH     = '/var/www/html/microservices-devops.app/devops-microservices-demo'
         DOMAIN            = 'learning.run.place'
