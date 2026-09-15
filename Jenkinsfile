@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY        = 'docker.io/yourdockerhubusername'   // change me
+        REGISTRY        = 'docker.io/gurlx'
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
         SERVICES        = 'frontend api-gateway user-service product-service order-service cart-service inventory-service payment-service notification-service review-service auth-service shipping-service search-service analytics-service'
         DEPLOY_HOST     = '100.58.229.167'

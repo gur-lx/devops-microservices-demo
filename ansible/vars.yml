@@ -3,5 +3,5 @@ deploy_user: deployer
 deploy_path: /opt/devops-microservices-demo
 jenkins_home_volume: jenkins_home
 jenkins_ui_port: 8081
-registry: docker.io/yourdockerhubusername   # change me
+registry: docker.io/gurlx
 image_tag: latest
