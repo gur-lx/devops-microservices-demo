@@ -1,0 +1,19 @@
+apiVersion: 1
+
+# Points at the deploy server's Prometheus/Loki over the public internet.
+# Update the IP here if the deploy server's address ever changes, and make
+# sure ports 9090/3100 are open in its security group (restricted to your
+# own IP -- neither service has built-in auth).
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://100.58.229.167:9090
+    isDefault: true
+    editable: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://100.58.229.167:3100
+    editable: true

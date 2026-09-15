@@ -1,0 +1,19 @@
+# Run this on your LOCAL machine, not on the server.
+# Grafana here is just a viewer -- it queries the deploy server's Prometheus
+# and Loki over the network (see provisioning/datasources/datasources.yml
+# for the server URLs). Nothing here talks to Docker on the server directly.
+services:
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=changeme
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  grafana_data:

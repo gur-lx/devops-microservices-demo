@@ -1,6 +1,7 @@
-# Observability stack: Prometheus (metrics) + Loki (logs) + Grafana (dashboards).
-# Deliberately kept as its own compose file, separate from the app stack --
-# see monitoring/README.md for why, and where to run this.
+# Server-side observability agents: Prometheus (metrics) + Loki (logs).
+# Grafana deliberately does NOT run here -- it runs on your local machine
+# instead, pointed at this server's Prometheus/Loki over the network. See
+# grafana-local/ and monitoring/README.md for why and how.
 services:
   prometheus:
     image: prom/prometheus:latest
@@ -60,22 +61,6 @@ services:
       - loki
     restart: unless-stopped
 
-  grafana:
-    image: grafana/grafana:latest
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=changeme
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-      - loki
-    restart: unless-stopped
-
 volumes:
   prometheus_data:
   loki_data:
-  grafana_data:

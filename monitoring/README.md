@@ -1,66 +1,57 @@
 # Monitoring stack: Prometheus + Loki + Grafana
 
-Observability for the deployed app: **Prometheus** scrapes metrics
-(container resource usage via cAdvisor, host stats via node-exporter),
-**Loki** collects logs (shipped by **Promtail**, which tails every
-container's logs via the Docker socket), and **Grafana** is the dashboard
-that ties both together — one UI, metrics and logs side by side.
+Observability for the deployed app, split across two locations:
 
-This is deliberately a **separate compose file** from the app
-(`docker-compose.prod.yml`) and from Jenkins — it's a different concern with
-a different lifecycle, and keeping it separate means you can stop/start/move
-it without touching the app.
+- **On the deploy server** (`monitoring/docker-compose.yml`): **Prometheus**
+  scrapes metrics (container resource usage via cAdvisor, host stats via
+  node-exporter), and **Loki** collects logs shipped by **Promtail** (which
+  tails every container's logs via the Docker socket).
+- **On your local machine** (`monitoring/grafana-local/docker-compose.yml`):
+  **Grafana** — just the dashboard UI, querying the server's Prometheus/Loki
+  over the network. Grafana itself never touches the server or its Docker
+  socket.
 
-## Where to run this
+This split exists because Grafana is one of the heavier pieces of this
+stack, and the deploy server (a t3.micro, ~1GB RAM, already running 14
+microservices + nginx-proxy + acme-companion) has no headroom to spare — we
+already spent a good while debugging OOM crash-loops on this box. Moving
+Grafana off it entirely, onto your own machine, removes that risk and gives
+you a snappier dashboard besides.
 
-**Given what we already learned the hard way**: both existing EC2 boxes
-(Jenkins server and deploy server) are t3.micro (≈1GB RAM) and are already
-near their limit at idle. This stack adds 6 more containers (Prometheus,
-node-exporter, cAdvisor, Loki, Promtail, Grafana) — each individually light
-(cAdvisor and Grafana are the heaviest, maybe 100-150MB each), but added on
-top of either existing box it risks the same OOM crash-looping we spent an
-hour debugging earlier.
+## 1. Server-side: Prometheus + Loki + Promtail
 
-**Strongly recommended:** run this on a **third, small EC2 instance**
-dedicated to observability (a `t3.micro` is fine just for this stack alone,
-since it's not also running Jenkins or the app). This also matches how
-monitoring is usually deployed for real — on its own infrastructure, so it
-keeps working (and keeps showing you *why* something broke) even if the app
-server itself is unhealthy.
-
-If you deploy it on its own box, point `node-exporter`/`cadvisor` there at
-*that* box's stats — to actually monitor the **deploy server**, either:
-- run this compose file **on the deploy server itself** (accepting the
-  resource risk noted above), or
-- point Prometheus's scrape targets at the deploy server's IP instead of
-  `node-exporter`/`cadvisor` as local service names, opening the relevant
-  ports (9100, 8080) on the deploy server's security group so this
-  monitoring box can reach them remotely.
-
-The default config here assumes **option 1** (running alongside what it's
-monitoring) for simplicity — adjust `prometheus/prometheus.yml` targets if
-you go with a remote setup instead.
-
-## Running it
-
+Run on the deploy server:
 ```bash
 cd monitoring
 docker compose up -d
 ```
 
-## Accessing it
+Open these ports in the deploy server's security group, **restricted to
+your own home/office IP** (not `0.0.0.0/0`) — neither Prometheus nor Loki
+has authentication built in:
+- `9090` (Prometheus)
+- `3100` (Loki)
 
-| Service | Port | What it's for |
-|---|---|---|
-| Grafana | `3000` | The dashboard UI — login `admin` / `changeme` (**change this immediately** in production) |
-| Prometheus | `9090` | Raw metrics UI/API — useful for testing PromQL queries directly |
-| cAdvisor | `8081` | Its own basic UI showing per-container stats |
-| Loki | `3100` | Internal API only, not meant to be browsed directly — query it through Grafana |
+(`8081`/cAdvisor doesn't need to be open externally — only Prometheus, which
+runs on the same box, needs to reach it, over the internal Docker network.)
 
-Open Grafana at `http://<this-box-ip>:3000`. Both **Prometheus** and
-**Loki** datasources are already provisioned automatically (see
-`grafana/provisioning/datasources/datasources.yml`) — no manual setup
-needed, they'll already be there under Connections → Data sources.
+## 2. Local: Grafana
+
+Run on your own machine:
+```bash
+cd monitoring/grafana-local
+docker compose up -d
+```
+
+Open `http://localhost:3000`, log in `admin` / `changeme`, and **change the
+password immediately** when prompted — this matters more once the server's
+ports are reachable from your home IP.
+
+Both **Prometheus** and **Loki** datasources are already provisioned
+automatically, pointed at the deploy server's public IP (see
+`grafana-local/provisioning/datasources/datasources.yml`) — no manual "Add
+data source" needed. If the deploy server's IP ever changes, update that
+file and restart this container.
 
 ## Getting dashboards without building your own
 
@@ -69,12 +60,15 @@ dashboards (Grafana → Dashboards → New → Import → paste the ID):
 
 - **1860** — Node Exporter Full (host CPU/mem/disk/network)
 - **14282** — cAdvisor / Docker container metrics
-- Explore tab → select the **Loki** datasource → query `{container="devops-microservices-demo-frontend-1"}` (or any container name) to see live logs, filterable by container
+- Explore tab → select the **Loki** datasource → query
+  `{container="devops-microservices-demo-frontend-1"}` (or any other
+  container name) to see live logs, filterable by container
 
-## Security group reminder
+## Why this works even though Grafana is "remote"
 
-Open port **3000** (Grafana) inbound on whichever box runs this. Keep
-**9090** (Prometheus) and **3100** (Loki) restricted to your own IP or
-closed entirely if not needed externally — they have no built-in auth by
-default (`auth_enabled: false` in `loki-config.yaml`), unlike Grafana which
-requires login.
+Grafana only needs to reach Prometheus's and Loki's HTTP APIs — it doesn't
+need to be on the same host or even the same network as what it's
+monitoring. The server's Prometheus does the actual scraping of local
+containers (that part stays local to the server, as it must), and Loki
+receives log pushes from the local Promtail — Grafana just queries both
+over the internet afterward, the same way any client hits a public API.
