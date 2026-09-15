@@ -5,8 +5,8 @@ pipeline {
         REGISTRY        = 'docker.io/yourdockerhubusername'   // change me
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
         SERVICES        = 'frontend api-gateway user-service product-service order-service cart-service inventory-service payment-service notification-service review-service auth-service shipping-service search-service analytics-service'
-        DEPLOY_HOST     = 'deploy-server'                       // SSH host alias, see GUIDE.md
-        DEPLOY_USER     = 'deployer'
+        DEPLOY_HOST     = '100.58.229.167'
+        DEPLOY_USER     = 'ubuntu'
         DEPLOY_PATH     = '/opt/devops-microservices-demo'
         DOMAIN            = 'learning.run.place'
         LETSENCRYPT_EMAIL = 'you@example.com'                   // change me -- used by acme-companion for cert notices
