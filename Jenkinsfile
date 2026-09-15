@@ -8,7 +8,7 @@ pipeline {
         DEPLOY_HOST     = '100.58.229.167'
         DEPLOY_USER     = 'ubuntu'
         DEPLOY_PATH     = '/var/www/html/microservices-devops.app/devops-microservices-demo'
-        DOMAIN            = 'microservices-devops.app'
+        DOMAIN            = 'learning.run.place'
         LETSENCRYPT_EMAIL = 'gurpiyar656@gmail.com'
     }
 
