@@ -7,8 +7,8 @@ pipeline {
         SERVICES        = 'frontend api-gateway user-service product-service order-service cart-service inventory-service payment-service notification-service review-service auth-service shipping-service search-service analytics-service'
         DEPLOY_HOST     = '100.58.229.167'
         DEPLOY_USER     = 'ubuntu'
-        DEPLOY_PATH     = '/opt/devops-microservices-demo'
-        DOMAIN            = 'learning.run.place'
+        DEPLOY_PATH     = '/var/www/html/microservices-devops.app/devops-microservices-demo'
+        DOMAIN            = 'microservices-devops.app'
         LETSENCRYPT_EMAIL = 'you@example.com'                   // change me -- used by acme-companion for cert notices
     }
 
@@ -57,6 +57,7 @@ pipeline {
             steps {
                 sshagent(credentials: ['deploy-server-ssh-key']) {
                     sh """
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} 'mkdir -p ${DEPLOY_PATH}'
                         scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/docker-compose.yml
                         ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '\
                             cd ${DEPLOY_PATH} && \
