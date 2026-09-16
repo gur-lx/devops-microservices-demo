@@ -30,14 +30,16 @@ pipeline {
                 script {
                     def scannerHome = tool 'SonarScanner'
                     withSonarQubeEnv('SonarQube') {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                              -Dsonar.projectKey=devops-microservices-demo \
-                              -Dsonar.projectName='DevOps Microservices Demo' \
-                              -Dsonar.projectVersion=${IMAGE_TAG} \
-                              -Dsonar.sources=services \
-                              -Dsonar.exclusions=**/node_modules/**
-                        """
+                        withEnv(["SONAR_SCANNER_OPTS=-Xmx1024m"]) {
+                            sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                  -Dsonar.projectKey=devops-microservices-demo \
+                                  -Dsonar.projectName='DevOps Microservices Demo' \
+                                  -Dsonar.projectVersion=${IMAGE_TAG} \
+                                  -Dsonar.sources=services \
+                                  -Dsonar.exclusions=**/node_modules/**
+                            """
+                        }
                     }
                 }
             }

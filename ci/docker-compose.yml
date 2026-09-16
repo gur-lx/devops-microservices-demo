@@ -2,10 +2,15 @@
 # commands used to set up Jenkins + SonarQube + its Postgres DB into one
 # compose file, with explicit memory ceilings on each container.
 #
-# Sized for 1GB RAM + 4GB swap (two 2GB swapfiles -- see ci/README.md).
-# Each service's memswap_limit (its combined RAM+swap ceiling) is set so
-# the three sum to ~3.8GB, leaving ~1.2GB of the 5GB total for the OS
-# itself, sshd, dockerd, etc. -- deliberately not maxed out to zero slack.
+# Sized for the resized box: 3.7GB RAM + 4GB swap (~7.7GB total). Limits
+# below sum to well under that, leaving real slack for the OS.
+#
+# The `jenkins` limit specifically has to cover more than Jenkins' own JVM
+# -- every `sh` pipeline step (docker build, sonar-scanner, etc.) runs as a
+# child process INSIDE this same container/cgroup, so its budget needs
+# headroom for whatever the busiest concurrent build step needs, not just
+# Jenkins itself. The old 500m (sized for the pre-resize 1GB box) OOM'd
+# the sonar-scanner subprocess mid-analysis for exactly this reason.
 #
 # IMPORTANT -- what this does and doesn't fix:
 # Jenkins + SonarQube + Postgres together want more real RAM than this box
@@ -37,8 +42,8 @@ services:
       - /usr/bin/docker:/usr/bin/docker
     group_add:
       - "109"   # docker group GID on the host -- confirm with: getent group docker
-    mem_limit: 500m
-    memswap_limit: 1000m
+    mem_limit: 2000m
+    memswap_limit: 3200m
     restart: unless-stopped
     networks:
       - ci-net
@@ -52,8 +57,8 @@ services:
       - POSTGRES_DB=sonarqube
     volumes:
       - sonar_db_data:/var/lib/postgresql/data
-    mem_limit: 100m
-    memswap_limit: 200m
+    mem_limit: 200m
+    memswap_limit: 400m
     restart: unless-stopped
     networks:
       - ci-net
@@ -78,8 +83,8 @@ services:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
-    mem_limit: 1500m
-    memswap_limit: 2600m
+    mem_limit: 2000m
+    memswap_limit: 3000m
     restart: unless-stopped
     networks:
       - ci-net
