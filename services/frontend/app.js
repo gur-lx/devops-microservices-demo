@@ -311,6 +311,18 @@ document.getElementById('add-order-form').addEventListener('submit', (e) => {
   input.value = '';
 });
 
+async function loadDeployInfo() {
+  try {
+    const res = await fetch('/version', { cache: 'no-store' });
+    const data = await res.json();
+    document.getElementById('deploy-build').textContent = `#${data.version}`;
+    document.getElementById('deploy-domain').textContent = data.domain || 'localhost';
+    document.getElementById('deploy-services').textContent = data.serviceCount;
+  } catch (err) {
+    document.getElementById('deploy-build').textContent = 'unreachable';
+  }
+}
+
 buildHealthGrid();
 pollHealth();
 loadUsers();
@@ -318,5 +330,7 @@ loadProducts();
 loadOrders();
 loadInventory();
 loadStats();
+loadDeployInfo();
 setInterval(pollHealth, 8000);
 setInterval(loadStats, 8000);
+setInterval(loadDeployInfo, 30000);

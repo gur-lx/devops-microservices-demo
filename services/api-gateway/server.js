@@ -23,6 +23,12 @@ const SERVICES = {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'api-gateway' }));
 
+app.get('/version', (req, res) => res.json({
+  version: process.env.BUILD_VERSION || 'dev',
+  domain: process.env.BUILD_DOMAIN || null,
+  serviceCount: Object.keys(SERVICES).length,
+}));
+
 app.get('/api-docs.json', (req, res) => res.json(openapiSpec));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {
   customSiteTitle: 'Microservices Demo API Docs',

@@ -18,7 +18,7 @@
     <span class="brand-mark">&lt;/&gt;</span>
     <div>
       <h1>Microservices DevOps Dashboard</h1>
-      <p class="tagline">CI/CD Training Project &mdash; Jenkins &middot; Docker &middot; Node.js Microservices</p>
+      <p class="tagline">CI/CD Training Project &mdash; Jenkins &middot; SonarQube &middot; Docker &middot; Microservices &middot; Prometheus/Grafana</p>
     </div>
   </div>
   <div class="topbar-actions">
@@ -33,10 +33,27 @@
 
 <main>
 
+  <div class="deploy-strip" id="deploy-strip">
+    <span class="deploy-strip-item">
+      <span class="deploy-strip-label">Build</span>
+      <span class="deploy-strip-value" id="deploy-build">&mdash;</span>
+    </span>
+    <span class="deploy-strip-sep">&middot;</span>
+    <span class="deploy-strip-item">
+      <span class="deploy-strip-label">Domain</span>
+      <span class="deploy-strip-value" id="deploy-domain">&mdash;</span>
+    </span>
+    <span class="deploy-strip-sep">&middot;</span>
+    <span class="deploy-strip-item">
+      <span class="deploy-strip-label">Services</span>
+      <span class="deploy-strip-value" id="deploy-services">&mdash;</span>
+    </span>
+  </div>
+
   <section class="panel architecture-panel">
     <h2><span class="section-icon">&#9881;</span> System Architecture</h2>
     <div class="diagram-wrap">
-      <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" class="arch-svg" role="img" aria-label="Architecture diagram: developer pushes to GitHub, Jenkins builds and pushes images, deploy server routes frontend and API gateway traffic into a mesh of twelve backend microservices">
+      <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" class="arch-svg" role="img" aria-label="Architecture diagram: developer pushes to GitHub, Jenkins builds images and runs a SonarQube quality gate, pushes to Docker Hub, then the deploy server terminates SSL and routes frontend and API gateway traffic into a mesh of twelve backend microservices">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"></path>
@@ -57,7 +74,8 @@
 
         <line x1="90" y1="55" x2="185" y2="55" class="flow-line" marker-end="url(#arrow)"></line>
         <line x1="285" y1="55" x2="380" y2="55" class="flow-line" marker-end="url(#arrow)"></line>
-        <line x1="440" y1="90" x2="440" y2="140" class="flow-line" marker-end="url(#arrow)"></line>
+        <line x1="440" y1="90" x2="440" y2="103" class="flow-line" marker-end="url(#arrow)"></line>
+        <line x1="440" y1="135" x2="440" y2="140" class="flow-line" marker-end="url(#arrow)"></line>
         <line x1="440" y1="200" x2="440" y2="230" class="flow-line-mute"></line>
 
         <line x1="620" y1="185" x2="620" y2="230" class="flow-line" marker-end="url(#arrow)"></line>
@@ -85,6 +103,11 @@
           <text x="440" y="78" class="node-sub node-sub-dim">Server A</text>
         </g>
 
+        <g class="node node-sonar">
+          <rect x="380" y="103" width="120" height="32" rx="8"></rect>
+          <text x="440" y="122" class="node-title-sm">SonarQube</text>
+        </g>
+
         <g class="node node-registry">
           <rect x="380" y="140" width="120" height="60" rx="10"></rect>
           <text x="440" y="165" class="node-title">Registry</text>
@@ -93,7 +116,8 @@
 
         <g class="node node-server">
           <rect x="560" y="140" width="120" height="45" rx="10"></rect>
-          <text x="620" y="166" class="node-title-sm">Deploy Server B</text>
+          <text x="620" y="160" class="node-title-sm">Deploy Server</text>
+          <text x="620" y="175" class="node-sub">nginx-proxy &middot; SSL</text>
         </g>
 
         <g class="node node-live node-frontend">
@@ -192,6 +216,32 @@
   <section class="panel">
     <h2><span class="section-icon">&#9889;</span> Live Service Health</h2>
     <div class="health-grid" id="health-grid"></div>
+  </section>
+
+  <section class="panel">
+    <h2><span class="section-icon">&#128200;</span> Observability</h2>
+    <div class="flow-diagram">
+      <div class="flow-node">
+        <span class="flow-label">Deploy Server</span>
+        <span class="flow-sub">Prometheus &middot; Loki &middot; Promtail</span>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <span class="flow-label">cAdvisor / node-exporter</span>
+        <span class="flow-sub">per-container &amp; host metrics</span>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <span class="flow-label">Grafana</span>
+        <span class="flow-sub">runs on a local machine, not the server</span>
+      </div>
+    </div>
+    <p class="observability-note">
+      Metrics and logs are collected on the deploy server; Grafana itself
+      runs off-server as a pure viewer, querying Prometheus/Loki over the
+      network &mdash; kept off this box deliberately since it's the
+      heaviest piece of the monitoring stack.
+    </p>
   </section>
 
   <section class="panel console-panel">
@@ -300,8 +350,15 @@
       <span class="badge">Docker</span>
       <span class="badge">Docker Compose</span>
       <span class="badge">Jenkins</span>
+      <span class="badge">SonarQube</span>
+      <span class="badge">Ansible</span>
       <span class="badge">Nginx</span>
+      <span class="badge">nginx-proxy + acme-companion</span>
+      <span class="badge">Let's Encrypt</span>
       <span class="badge">GitHub Webhooks</span>
+      <span class="badge">Prometheus</span>
+      <span class="badge">Loki</span>
+      <span class="badge">Grafana</span>
       <span class="badge">Microservices</span>
       <span class="badge">API Gateway</span>
       <span class="badge">14 Services</span>
@@ -312,7 +369,7 @@
 </main>
 
 <footer>
-  <p>College DevOps Training Project &mdash; CI/CD pipeline: <code>git push</code> &rarr; Jenkins build &amp; push &rarr; Docker Compose deploy</p>
+  <p>College DevOps Training Project &mdash; CI/CD pipeline: <code>git push</code> &rarr; Jenkins build &rarr; SonarQube quality gate &rarr; Docker Hub &rarr; Docker Compose deploy &rarr; Prometheus/Loki/Grafana</p>
 </footer>
 
 <script src="app.js"></script>

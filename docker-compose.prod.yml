@@ -61,6 +61,8 @@ services:
     expose:
       - "8080"
     environment:
+      - BUILD_VERSION=${IMAGE_TAG:-dev}
+      - BUILD_DOMAIN=${DOMAIN:-}
       - USER_SERVICE_URL=http://user-service:3001
       - PRODUCT_SERVICE_URL=http://product-service:3002
       - ORDER_SERVICE_URL=http://order-service:3003

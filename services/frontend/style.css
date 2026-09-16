@@ -141,6 +141,39 @@ main {
   margin: 0 auto;
 }
 
+.deploy-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 8px 18px;
+  align-self: flex-start;
+}
+
+.deploy-strip-label { margin-right: 6px; }
+
+.deploy-strip-value {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.deploy-strip-sep {
+  color: var(--panel-border);
+}
+
+.observability-note {
+  margin: 14px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -188,6 +221,7 @@ main {
   stroke-width: 1;
 }
 .arch-svg .node-jenkins rect { stroke: var(--accent-2); fill: rgba(99,102,241,0.12); }
+.arch-svg .node-sonar rect { stroke: var(--pending); fill: rgba(251,191,36,0.1); }
 .arch-svg .node-registry rect { stroke: var(--accent); fill: rgba(34,211,238,0.1); }
 .arch-svg .node-live rect { stroke: var(--good); fill: rgba(52,211,153,0.08); }
 .arch-svg .node-server rect { stroke-dasharray: 4 3; fill: transparent; }
