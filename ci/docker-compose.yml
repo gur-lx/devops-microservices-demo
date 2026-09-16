@@ -2,16 +2,23 @@
 # commands used to set up Jenkins + SonarQube + its Postgres DB into one
 # compose file, with explicit memory ceilings on each container.
 #
+# Sized for 1GB RAM + 4GB swap (two 2GB swapfiles -- see ci/README.md).
+# Each service's memswap_limit (its combined RAM+swap ceiling) is set so
+# the three sum to ~3.8GB, leaving ~1.2GB of the 5GB total for the OS
+# itself, sshd, dockerd, etc. -- deliberately not maxed out to zero slack.
+#
 # IMPORTANT -- what this does and doesn't fix:
-# Server A has ~908Mi of real RAM. Jenkins + SonarQube + Postgres together
-# want more than that even under light load (SonarQube alone runs 3 JVMs:
-# web, compute engine, and an embedded Elasticsearch). Setting mem_limit
-# here does NOT create more RAM -- it just means that if one container
-# tries to exceed its own limit, THAT container gets OOM-killed and
-# restarts on its own, instead of the kernel picking an arbitrary victim
-# process on the whole host (which is what happened before -- it killed
-# Jenkins' own JVM directly, mid-build). Contained, recoverable failures
-# instead of host-wide chaos -- not a substitute for more RAM.
+# Jenkins + SonarQube + Postgres together want more real RAM than this box
+# has, even with swap added (SonarQube alone runs 3 JVMs: web, compute
+# engine, and an embedded Elasticsearch). mem_limit/memswap_limit don't
+# create more RAM -- they mean that if one container tries to exceed its
+# own budget, THAT container gets OOM-killed and restarts on its own
+# (restart: unless-stopped), instead of the kernel picking an arbitrary
+# victim process on the whole host (which is what happened before -- it
+# killed Jenkins' own JVM directly, mid-build). Contained, recoverable
+# failures instead of host-wide chaos -- not a substitute for more RAM,
+# and swap is disk-backed, so expect things to feel slow whenever a
+# container is actually leaning on it.
 #
 # Volumes below are marked `external: true` because they already exist
 # from the original `docker run -v <name>:...` commands -- this reuses
@@ -30,8 +37,8 @@ services:
       - /usr/bin/docker:/usr/bin/docker
     group_add:
       - "109"   # docker group GID on the host -- confirm with: getent group docker
-    mem_limit: 700m
-    memswap_limit: 1400m
+    mem_limit: 500m
+    memswap_limit: 1000m
     restart: unless-stopped
     networks:
       - ci-net
@@ -45,8 +52,8 @@ services:
       - POSTGRES_DB=sonarqube
     volumes:
       - sonar_db_data:/var/lib/postgresql/data
-    mem_limit: 150m
-    memswap_limit: 300m
+    mem_limit: 100m
+    memswap_limit: 200m
     restart: unless-stopped
     networks:
       - ci-net
@@ -71,8 +78,8 @@ services:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
-    mem_limit: 1400m
-    memswap_limit: 2800m
+    mem_limit: 1500m
+    memswap_limit: 2600m
     restart: unless-stopped
     networks:
       - ci-net
