@@ -1,0 +1,94 @@
+# Runs on Server A (the Jenkins/CI box). Consolidates the ad-hoc `docker run`
+# commands used to set up Jenkins + SonarQube + its Postgres DB into one
+# compose file, with explicit memory ceilings on each container.
+#
+# IMPORTANT -- what this does and doesn't fix:
+# Server A has ~908Mi of real RAM. Jenkins + SonarQube + Postgres together
+# want more than that even under light load (SonarQube alone runs 3 JVMs:
+# web, compute engine, and an embedded Elasticsearch). Setting mem_limit
+# here does NOT create more RAM -- it just means that if one container
+# tries to exceed its own limit, THAT container gets OOM-killed and
+# restarts on its own, instead of the kernel picking an arbitrary victim
+# process on the whole host (which is what happened before -- it killed
+# Jenkins' own JVM directly, mid-build). Contained, recoverable failures
+# instead of host-wide chaos -- not a substitute for more RAM.
+#
+# Volumes below are marked `external: true` because they already exist
+# from the original `docker run -v <name>:...` commands -- this reuses
+# that existing data (Jenkins jobs/credentials, SonarQube's DB) instead of
+# silently creating new empty volumes with a Compose-prefixed name.
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+    group_add:
+      - "109"   # docker group GID on the host -- confirm with: getent group docker
+    mem_limit: 700m
+    memswap_limit: 1400m
+    restart: unless-stopped
+    networks:
+      - ci-net
+
+  sonar-db:
+    image: postgres:15-alpine
+    container_name: sonar-db
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+      - POSTGRES_DB=sonarqube
+    volumes:
+      - sonar_db_data:/var/lib/postgresql/data
+    mem_limit: 150m
+    memswap_limit: 300m
+    restart: unless-stopped
+    networks:
+      - ci-net
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    depends_on:
+      - sonar-db
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://sonar-db:5432/sonarqube
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonar
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      nproc: 4096
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    mem_limit: 1400m
+    memswap_limit: 2800m
+    restart: unless-stopped
+    networks:
+      - ci-net
+
+networks:
+  ci-net:
+    driver: bridge
+
+volumes:
+  jenkins_home:
+    external: true
+  sonar_db_data:
+    external: true
+  sonarqube_data:
+    external: true
+  sonarqube_extensions:
+    external: true
+  sonarqube_logs:
+    external: true
