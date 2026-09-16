@@ -47,11 +47,10 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                // abortPipeline: false so a failing gate doesn't block your deploy while
-                // you're still tuning it -- flip to true once you trust it, so bad code
-                // actually stops the pipeline before it reaches production.
+                // abortPipeline: true -- a failing SonarQube quality gate now stops the
+                // pipeline here, before Build/Push/Deploy ever run.
                 timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
