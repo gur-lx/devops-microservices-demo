@@ -25,6 +25,35 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarScanner'
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                              -Dsonar.projectKey=devops-microservices-demo \
+                              -Dsonar.projectName='DevOps Microservices Demo' \
+                              -Dsonar.projectVersion=${IMAGE_TAG} \
+                              -Dsonar.sources=services \
+                              -Dsonar.exclusions=**/node_modules/**
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                // abortPipeline: false so a failing gate doesn't block your deploy while
+                // you're still tuning it -- flip to true once you trust it, so bad code
+                // actually stops the pipeline before it reaches production.
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
+                }
+            }
+        }
+
         stage('Build images') {
             steps {
                 script {
