@@ -74,6 +74,10 @@ services:
       - SONAR_JDBC_URL=jdbc:postgresql://sonar-db:5432/sonarqube
       - SONAR_JDBC_USERNAME=sonar
       - SONAR_JDBC_PASSWORD=sonar
+      # Served at jenkins.run.place/sonar/ via the reverse-proxy below --
+      # this tells SonarQube to generate all its own links/assets under
+      # that path instead of assuming it owns the domain root.
+      - SONAR_WEB_CONTEXT=/sonar
     ulimits:
       nofile:
         soft: 65536
@@ -88,6 +92,37 @@ services:
     restart: unless-stopped
     networks:
       - ci-net
+
+  reverse-proxy:
+    image: nginx:alpine
+    container_name: reverse-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./reverse-proxy/conf.d:/etc/nginx/conf.d:ro
+      - certbot_conf:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    mem_limit: 100m
+    memswap_limit: 200m
+    restart: unless-stopped
+    networks:
+      - ci-net
+
+  # Renews the cert twice a day (only actually renews within ~30 days of
+  # expiry; harmless the rest of the time). Does NOT obtain the first
+  # cert -- that's a one-off manual step, see ci/reverse-proxy/README.md.
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait; done"
+    mem_limit: 100m
+    memswap_limit: 200m
+    restart: unless-stopped
 
 networks:
   ci-net:
@@ -104,3 +139,5 @@ volumes:
     external: true
   sonarqube_logs:
     external: true
+  certbot_conf:
+  certbot_webroot:

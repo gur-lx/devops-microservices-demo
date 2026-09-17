@@ -74,3 +74,11 @@ swap or tighter limits.
 sudo docker stats --no-stream
 free -h
 ```
+
+## Domain + HTTPS
+
+Both Jenkins and SonarQube are reachable at `https://jenkins.run.place`
+(Jenkins at `/`, SonarQube at `/sonar/`) via a hand-written nginx +
+certbot setup — see [reverse-proxy/README.md](reverse-proxy/README.md)
+for the one-time bootstrap steps and an important required change to
+Jenkins' SonarQube server URL config.
