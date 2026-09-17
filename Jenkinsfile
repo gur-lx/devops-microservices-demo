@@ -1,3 +1,17 @@
+// Posts a message to the Google Chat space configured via the
+// 'google-chat-webhook' Secret text credential. Never fails the build if
+// the webhook itself is down/misconfigured -- notification failures
+// shouldn't take down an otherwise-successful pipeline.
+def notifyGoogleChat(String message) {
+    withCredentials([string(credentialsId: 'google-chat-webhook', variable: 'CHAT_WEBHOOK')]) {
+        sh """
+            curl -s -X POST -H 'Content-Type: application/json; charset=UTF-8' \
+              -d '{"text": "${message}"}' \
+              "\$CHAT_WEBHOOK" > /dev/null || true
+        """
+    }
+}
+
 pipeline {
     agent any
 
@@ -108,9 +122,11 @@ pipeline {
     post {
         success {
             echo "Deployed build ${IMAGE_TAG} successfully."
+            notifyGoogleChat("✅ *${JOB_NAME}* build #${BUILD_NUMBER} succeeded — deployed to ${DOMAIN}. <${BUILD_URL}|View build>")
         }
         failure {
             echo "Pipeline failed - deployment did not run or was interrupted."
+            notifyGoogleChat("❌ *${JOB_NAME}* build #${BUILD_NUMBER} failed. <${BUILD_URL}console|View console log>")
         }
         always {
             sh 'docker logout || true'
