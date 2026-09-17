@@ -5,9 +5,10 @@
 def notifyGoogleChat(String message) {
     withCredentials([string(credentialsId: 'google-chat-webhook', variable: 'CHAT_WEBHOOK')]) {
         sh """
-            curl -s -X POST -H 'Content-Type: application/json; charset=UTF-8' \
+            echo "Posting to Google Chat..."
+            curl -s -w '\\nHTTP status: %{http_code}\\n' -X POST -H 'Content-Type: application/json; charset=UTF-8' \
               -d '{"text": "${message}"}' \
-              "\$CHAT_WEBHOOK" > /dev/null || true
+              "\$CHAT_WEBHOOK" || true
         """
     }
 }
