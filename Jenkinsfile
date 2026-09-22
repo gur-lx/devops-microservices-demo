@@ -118,6 +118,23 @@ pipeline {
                 }
             }
         }
+
+        // Demo only: on a successful build, provision exactly one EC2
+        // instance via Terraform. Not an auto-scaler -- proves Jenkins can
+        // drive infrastructure-as-code. Placed last so it only runs once
+        // everything before it (build/push/deploy) has already succeeded.
+        stage('Provision demo EC2 instance (Terraform)') {
+            steps {
+                sh """
+                    docker run --rm \
+                      -v \$(pwd)/terraform:/workspace \
+                      -w /workspace \
+                      --entrypoint /bin/sh \
+                      hashicorp/terraform:latest \
+                      -c "terraform init -input=false && terraform apply -auto-approve -input=false -var='build_number=${BUILD_NUMBER}'"
+                """
+            }
+        }
     }
 
     post {
