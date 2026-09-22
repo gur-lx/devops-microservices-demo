@@ -16,6 +16,18 @@ def notifyGoogleChat(String message) {
 pipeline {
     agent any
 
+    // DESTROY_TERRAFORM_INSTANCE defaults to false, so every normal
+    // webhook-triggered push build behaves exactly as before -- it only
+    // becomes true if a human explicitly checks it via "Build with
+    // Parameters" in the Jenkins UI.
+    parameters {
+        booleanParam(
+            name: 'DESTROY_TERRAFORM_INSTANCE',
+            defaultValue: false,
+            description: 'Check this and click Build to DESTROY the demo EC2 instance instead of building/deploying. Skips all other stages.'
+        )
+    }
+
     environment {
         REGISTRY        = 'docker.io/gurlx'
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
@@ -41,6 +53,7 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
+            when { expression { !params.DESTROY_TERRAFORM_INSTANCE } }
             steps {
                 script {
                     def scannerHome = tool 'SonarScanner'
@@ -61,6 +74,7 @@ pipeline {
         }
 
         stage('Quality Gate') {
+            when { expression { !params.DESTROY_TERRAFORM_INSTANCE } }
             steps {
                 // abortPipeline: true -- a failing SonarQube quality gate now stops the
                 // pipeline here, before Build/Push/Deploy ever run.
@@ -71,6 +85,7 @@ pipeline {
         }
 
         stage('Build images') {
+            when { expression { !params.DESTROY_TERRAFORM_INSTANCE } }
             steps {
                 script {
                     SERVICES.split(' ').each { svc ->
@@ -81,6 +96,7 @@ pipeline {
         }
 
         stage('Push images') {
+            when { expression { !params.DESTROY_TERRAFORM_INSTANCE } }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
@@ -99,6 +115,7 @@ pipeline {
         }
 
         stage('Deploy to server') {
+            when { expression { !params.DESTROY_TERRAFORM_INSTANCE } }
             steps {
                 sshagent(credentials: ['deploy-server-ssh-key']) {
                     sh """
@@ -132,22 +149,37 @@ pipeline {
         // (which Docker resolves correctly regardless of container) rather
         // than reusing the in-container path string, which would silently
         // bind an empty, newly-created host directory instead.
-        stage('Provision demo EC2 instance (Terraform)') {
+        stage('Provision/destroy demo EC2 instance (Terraform)') {
             steps {
                 sh """
                     docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest init -input=false
                 """
-                sh """
-                    docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest apply -auto-approve -input=false -var=build_number=${BUILD_NUMBER}
-                """
+                script {
+                    if (params.DESTROY_TERRAFORM_INSTANCE) {
+                        sh """
+                            docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest destroy -auto-approve -input=false -var=build_number=${BUILD_NUMBER}
+                        """
+                        notifyGoogleChat("⚠️ *${JOB_NAME}* build #${BUILD_NUMBER}: demo EC2 instance destroyed on request.")
+                    } else {
+                        sh """
+                            docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest apply -auto-approve -input=false -var=build_number=${BUILD_NUMBER}
+                        """
+                    }
+                }
             }
         }
     }
 
     post {
         success {
-            echo "Deployed build ${IMAGE_TAG} successfully."
-            notifyGoogleChat("✅ *${JOB_NAME}* build #${BUILD_NUMBER} succeeded — deployed to ${DOMAIN}. <${BUILD_URL}|View build>")
+            script {
+                if (params.DESTROY_TERRAFORM_INSTANCE) {
+                    echo "Demo EC2 instance destroyed (build ${IMAGE_TAG})."
+                } else {
+                    echo "Deployed build ${IMAGE_TAG} successfully."
+                    notifyGoogleChat("✅ *${JOB_NAME}* build #${BUILD_NUMBER} succeeded — deployed to ${DOMAIN}. <${BUILD_URL}|View build>")
+                }
+            }
         }
         failure {
             echo "Pipeline failed - deployment did not run or was interrupted."
