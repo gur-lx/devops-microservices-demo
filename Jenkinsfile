@@ -123,13 +123,22 @@ pipeline {
         // instance via Terraform. Not an auto-scaler -- proves Jenkins can
         // drive infrastructure-as-code. Placed last so it only runs once
         // everything before it (build/push/deploy) has already succeeded.
+        //
+        // Docker-outside-of-Docker gotcha: `docker run` here talks to the
+        // HOST's docker daemon (via the mounted socket), so -v sources must
+        // be paths that exist on the HOST, not inside this Jenkins
+        // container. jenkins_home is a named volume, not literally a host
+        // folder at /var/jenkins_home -- so we mount the volume BY NAME
+        // (which Docker resolves correctly regardless of container) rather
+        // than reusing the in-container path string, which would silently
+        // bind an empty, newly-created host directory instead.
         stage('Provision demo EC2 instance (Terraform)') {
             steps {
                 sh """
-                    docker run --rm -v \$(pwd)/terraform:/workspace -w /workspace hashicorp/terraform:latest init -input=false
+                    docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest init -input=false
                 """
                 sh """
-                    docker run --rm -v \$(pwd)/terraform:/workspace -w /workspace hashicorp/terraform:latest apply -auto-approve -input=false -var=build_number=${BUILD_NUMBER}
+                    docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest apply -auto-approve -input=false -var=build_number=${BUILD_NUMBER}
                 """
             }
         }
