@@ -126,12 +126,10 @@ pipeline {
         stage('Provision demo EC2 instance (Terraform)') {
             steps {
                 sh """
-                    docker run --rm \
-                      -v \$(pwd)/terraform:/workspace \
-                      -w /workspace \
-                      --entrypoint /bin/sh \
-                      hashicorp/terraform:latest \
-                      -c "terraform init -input=false && terraform apply -auto-approve -input=false -var='build_number=${BUILD_NUMBER}'"
+                    docker run --rm -v \$(pwd)/terraform:/workspace -w /workspace hashicorp/terraform:latest init -input=false
+                """
+                sh """
+                    docker run --rm -v \$(pwd)/terraform:/workspace -w /workspace hashicorp/terraform:latest apply -auto-approve -input=false -var=build_number=${BUILD_NUMBER}
                 """
             }
         }
