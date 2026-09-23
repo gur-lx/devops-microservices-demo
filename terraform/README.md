@@ -11,24 +11,35 @@ The Jenkins pipeline has an `INFRA_ACTION` dropdown:
 - `BUILD` runs `terraform apply`, then builds and deploys the application.
 - `DESTROY` runs `terraform destroy` and skips build, push, and deployment.
 
-Running the pipeline again doesn't create a second instance — Terraform
-converges to the same declared state each time (that's normal, correct
-behavior, not a bug). It'll update the instance's `BuildNumber` tag on each
-run so you can see which build last touched it.
+**Every successful `BUILD` run replaces the instance and its SSH key**, on
+purpose — the pipeline passes `-replace` on the key pair, private key, and
+instance resources, forcing Terraform to destroy and recreate all three
+even though nothing in their configuration changed. This is a deliberate
+tradeoff: AWS ties an SSH key to instance *launch*, so there's no way to
+rotate the key on a running instance without relaunching it. If you want a
+genuinely new PEM every build (which is what this demo does), you accept
+a new instance every build too — this is **not** the "converges to the
+same instance" idempotent behavior a normal `terraform apply` would give
+you, and it means each `BUILD` run bills for a fresh instance-hour and
+takes as long as a full instance boot, not just a tag update.
 
 The instance receives an IAM instance profile with
-`AmazonSSMManagedInstanceCore`. The pipeline also generates a unique RSA PEM
-for the selected `SERVER_NUMBER`, adds the public key to AWS, and publishes
-the private key as a protected Jenkins build artifact. The Google Chat
-message contains only the protected artifact URL; it never contains the
-private key text.
+`AmazonSSMManagedInstanceCore`. Each `BUILD` run generates a fresh RSA
+keypair, adds its public half to AWS as `jenkins-demo-server-<SERVER_NUMBER>`
+(same name every time — only the key *material* is new each build, not the
+AWS-side key pair name), and publishes the private key as a Jenkins build
+artifact named `server-<SERVER_NUMBER>-build-<BUILD_NUMBER>.pem` — unique
+per build, so old builds' artifact lists keep their own (now-orphaned,
+since the instance they matched is gone) PEMs for reference. The Google
+Chat message contains only the protected artifact URL; it never contains
+the private key text.
 
 Download the artifact only through an authenticated Jenkins account, then
 restrict it locally:
 
 ```bash
-chmod 600 server-1.pem
-ssh -i server-1.pem ubuntu@<public-ip>
+chmod 600 server-1-build-42.pem   # match the actual filename Jenkins gave you
+ssh -i server-1-build-42.pem ubuntu@<public-ip>
 ```
 
 SSM remains available without a PEM:
@@ -58,28 +69,39 @@ rather than using a broad managed policy):
       "Action": [
         "ec2:RunInstances",
         "ec2:TerminateInstances",
-        "ec2:DescribeInstances",
-        "ec2:DescribeImages",
-        "ec2:DescribeSecurityGroups",
-        "ec2:DescribeSubnets",
-        "ec2:DescribeKeyPairs",
         "ec2:CreateTags",
-        "ec2:DescribeTags",
+        "ec2:ImportKeyPair",
+        "ec2:DeleteKeyPair",
+        "ec2:Describe*",
         "iam:CreateRole",
-        "iam:PutRolePolicy",
-        "iam:AttachRolePolicy",
-        "iam:CreateInstanceProfile",
-        "iam:AddRoleToInstanceProfile",
-        "iam:PassRole",
         "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:TagRole",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies",
+        "iam:CreateInstanceProfile",
         "iam:DeleteInstanceProfile",
-        "iam:DetachRolePolicy"
+        "iam:GetInstanceProfile",
+        "iam:TagInstanceProfile",
+        "iam:AddRoleToInstanceProfile",
+        "iam:RemoveRoleFromInstanceProfile",
+        "iam:PassRole"
       ],
       "Resource": "*"
     }
   ]
 }
 ```
+
+`ec2:Describe*` is a read-only wildcard covering `DescribeInstances`,
+`DescribeImages`, `DescribeInstanceTypes`, etc. — safe to broaden since none
+of these can change anything, and it avoids re-discovering one missing
+Describe permission at a time as the AWS provider reads back more computed
+attributes (which is exactly what happened before this policy was widened).
 
 Name the role something like `jenkins-terraform-demo`, then: AWS Console
 → EC2 → Instances → select Server A → Actions → Security → **Modify IAM
@@ -115,11 +137,25 @@ find your job's workspace path from the Jenkins job page (left sidebar
 shows "Workspace" once a build has run at least once), or just let the
 first build fail at this stage and create the file at the path it reports.
 
+**If you already had a `terraform.tfvars` from before `server_number` was
+introduced**, edit it — remove any `key_name = "..."` line (that variable
+no longer exists; the key pair is generated automatically now) and add
+`server_number = "1"` instead. Leaving a stale `key_name` line in there
+will make every `terraform` command fail immediately with "Error: Value
+for undeclared variable."
+
 ## Verifying it worked
 
+Run this **on Server A** (not inside a plain `docker run -v $(pwd)...` --
+that binds an empty host directory instead of the real workspace, since
+`docker run` from inside the Jenkins container talks to the host's docker
+daemon, and `jenkins_home` is a named volume, not literally a folder at
+that path on the host):
+
 ```bash
-docker run --rm -v $(pwd):/workspace -w /workspace --entrypoint /bin/sh \
-  hashicorp/terraform:latest -c "terraform show"
+docker run --rm -v jenkins_home:/var/jenkins_home \
+  -w /var/jenkins_home/workspace/devops-microservices-demo/terraform \
+  hashicorp/terraform:latest show
 ```
 
 Or just check the AWS Console — you should see one instance tagged
@@ -128,11 +164,12 @@ Or just check the AWS Console — you should see one instance tagged
 ## Cleaning up
 
 This creates a real, billed EC2 instance. To remove it when you're done
-demonstrating, choose `DESTROY` in Jenkins and click **Build**. Terraform
-uses the state in the Jenkins job workspace, so run `DESTROY` from the same
-Jenkins job that ran `BUILD`.
+demonstrating, choose `DESTROY` in Jenkins and click **Build** (matching
+`SERVER_NUMBER`). Terraform uses the state in the Jenkins job workspace, so
+run `DESTROY` from the same Jenkins job that ran `BUILD` -- this is the
+supported path, not a manual `terraform destroy` from the command line.
 
-```bash
-docker run --rm -v $(pwd):/workspace -w /workspace --entrypoint /bin/sh \
-  hashicorp/terraform:latest -c "terraform destroy -auto-approve"
-```
+If you ever do need to run it manually (e.g. debugging on Server A
+directly), use the same named-volume mount as the verification command
+above, not a plain `-v $(pwd):/workspace` -- see the note in "Verifying it
+worked."

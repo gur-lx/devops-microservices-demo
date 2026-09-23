@@ -195,16 +195,24 @@ pipeline {
                                 docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest destroy -auto-approve -input=false -var=build_number=${BUILD_NUMBER} -var=server_number=${params.SERVER_NUMBER}
                             """
                         } else {
+                            // -replace forces these three to be destroyed and recreated on
+                            // EVERY build, regardless of whether their config changed --
+                            // that's what makes each build's PEM genuinely new (AWS ties an
+                            // SSH key to instance launch; there's no way to rotate the key
+                            // on a running instance without relaunching it). This is a
+                            // deliberate tradeoff: you get a fresh key every time, at the
+                            // cost of losing the "same instance persists" behavior and a
+                            // slower build (full instance boot each run).
                             sh """
-                                docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest apply -auto-approve -input=false -var=build_number=${BUILD_NUMBER} -var=server_number=${params.SERVER_NUMBER}
-                                docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest output -raw private_key_pem > terraform/server-${params.SERVER_NUMBER}.pem
+                                docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest apply -auto-approve -input=false -replace=tls_private_key.demo -replace=aws_key_pair.demo -replace=aws_instance.demo -var=build_number=${BUILD_NUMBER} -var=server_number=${params.SERVER_NUMBER}
+                                docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest output -raw private_key_pem > terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem
                             """
                             instanceDetails = new JsonSlurperClassic().parseText(sh(
                                 returnStdout: true,
                                 script: "docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest output -json"
                             ).trim())
-                            sh "chmod 600 terraform/server-${params.SERVER_NUMBER}.pem"
-                            archiveArtifacts artifacts: "terraform/server-${params.SERVER_NUMBER}.pem", fingerprint: true
+                            sh "chmod 600 terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem"
+                            archiveArtifacts artifacts: "terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem", fingerprint: true
                         }
                     }
                 }
@@ -227,7 +235,7 @@ Stage durations: ${stageDurations}
                         privateIp: instanceDetails.private_ip?.value ?: 'n/a',
                         zone: instanceDetails.availability_zone?.value ?: 'n/a',
                         key: instanceDetails.key_name?.value ?: "jenkins-demo-server-${params.SERVER_NUMBER}",
-                        pem: "${BUILD_URL}artifact/terraform/server-${params.SERVER_NUMBER}.pem"
+                        pem: "${BUILD_URL}artifact/terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem"
                     ]
                     echo "Deployed build ${IMAGE_TAG}. Instance: ${details}. Stage durations: ${stageDurations}"
                     notifyGoogleChat("""✅ *${JOB_NAME}* build #${BUILD_NUMBER} succeeded.
@@ -247,7 +255,7 @@ Stage durations: ${stageDurations}
             notifyGoogleChat("❌ *${JOB_NAME}* build #${BUILD_NUMBER} failed. <${BUILD_URL}console|View console log>")
         }
         always {
-            sh "rm -f terraform/server-${params.SERVER_NUMBER}.pem || true"
+            sh "rm -f terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem || true"
             sh 'docker logout || true'
         }
     }
