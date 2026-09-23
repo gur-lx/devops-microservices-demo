@@ -166,7 +166,6 @@ pipeline {
                 }
             }
         }
-        }
 
         // Demo only: on a successful build, provision exactly one EC2
         // instance via Terraform. Not an auto-scaler -- proves Jenkins can
