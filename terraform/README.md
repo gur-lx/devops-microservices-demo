@@ -8,13 +8,38 @@ infrastructure-as-code.
 
 The Jenkins pipeline has an `INFRA_ACTION` dropdown:
 
-- `MAKE` runs `terraform apply`, then builds and deploys the application.
+- `BUILD` runs `terraform apply`, then builds and deploys the application.
 - `DESTROY` runs `terraform destroy` and skips build, push, and deployment.
 
 Running the pipeline again doesn't create a second instance — Terraform
 converges to the same declared state each time (that's normal, correct
 behavior, not a bug). It'll update the instance's `BuildNumber` tag on each
 run so you can see which build last touched it.
+
+The instance receives an IAM instance profile with
+`AmazonSSMManagedInstanceCore`. The pipeline also generates a unique RSA PEM
+for the selected `SERVER_NUMBER`, adds the public key to AWS, and publishes
+the private key as a protected Jenkins build artifact. The Google Chat
+message contains only the protected artifact URL; it never contains the
+private key text.
+
+Download the artifact only through an authenticated Jenkins account, then
+restrict it locally:
+
+```bash
+chmod 600 server-1.pem
+ssh -i server-1.pem ubuntu@<public-ip>
+```
+
+SSM remains available without a PEM:
+
+```bash
+aws ssm start-session --target <instance-id> --region <aws-region>
+```
+
+The AMI must include the SSM Agent (current Ubuntu and Amazon Linux AMIs
+usually do), and the instance must be able to reach the SSM endpoints through
+its network route/NAT gateway or VPC endpoints.
 
 ## Setup (do this once, on Server A)
 
@@ -39,7 +64,16 @@ rather than using a broad managed policy):
         "ec2:DescribeSubnets",
         "ec2:DescribeKeyPairs",
         "ec2:CreateTags",
-        "ec2:DescribeTags"
+        "ec2:DescribeTags",
+        "iam:CreateRole",
+        "iam:PutRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:CreateInstanceProfile",
+        "iam:AddRoleToInstanceProfile",
+        "iam:PassRole",
+        "iam:DeleteRole",
+        "iam:DeleteInstanceProfile",
+        "iam:DetachRolePolicy"
       ],
       "Resource": "*"
     }
@@ -73,7 +107,7 @@ describe-instances` if you have the CLI configured locally.)
 ```bash
 cd ~/ci/jenkins-workspace-or-wherever/devops-microservices-demo/terraform  # adjust to your actual Jenkins workspace path
 cp terraform.tfvars.example terraform.tfvars
-nano terraform.tfvars   # fill in your real ami_id, key_name, security_group_id
+nano terraform.tfvars   # fill in ami_id and security_group_id
 ```
 
 The actual path is `<jenkins-job-workspace>/terraform/terraform.tfvars` —
@@ -96,7 +130,7 @@ Or just check the AWS Console — you should see one instance tagged
 This creates a real, billed EC2 instance. To remove it when you're done
 demonstrating, choose `DESTROY` in Jenkins and click **Build**. Terraform
 uses the state in the Jenkins job workspace, so run `DESTROY` from the same
-Jenkins job that ran `MAKE`.
+Jenkins job that ran `BUILD`.
 
 ```bash
 docker run --rm -v $(pwd):/workspace -w /workspace --entrypoint /bin/sh \
