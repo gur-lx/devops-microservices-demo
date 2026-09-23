@@ -17,12 +17,18 @@ def notifyGoogleChat(String message) {
 
 def stageDurations = [:]
 def instanceDetails = [:]
+// Uses Date instead of System.nanoTime()/currentTimeMillis() -- Jenkins'
+// script security sandbox rejects raw java.lang.System static calls by
+// default (needs manual admin approval in "In-process Script Approval"),
+// and since every stage goes through this function, that rejection aborted
+// the ENTIRE pipeline on the very first stage. Date's instance methods
+// don't need that approval.
 def timedStage(String name, Closure body) {
-    def started = System.nanoTime()
+    def started = new Date().time
     try {
         body()
     } finally {
-        stageDurations[name] = String.format('%.1fs', (System.nanoTime() - started) / 1_000_000_000.0)
+        stageDurations[name] = String.format('%.1fs', (new Date().time - started) / 1000.0)
     }
 }
 
