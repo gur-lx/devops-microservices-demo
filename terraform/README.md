@@ -1,9 +1,15 @@
-# Terraform demo: Jenkins provisions one EC2 instance on success
+# Terraform demo: Jenkins manages one EC2 instance
 
-Proof-of-concept only — on a successful build, the pipeline runs
-`terraform apply` to ensure exactly **one** demo EC2 instance exists. This
-is deliberately *not* an Auto Scaling Group or real scaling system; it's a
-minimal demonstration that Jenkins can drive infrastructure-as-code.
+Proof-of-concept only — the pipeline can run `terraform apply` to ensure
+exactly **one** demo EC2 instance exists, or `terraform destroy` to remove
+that instance. This is deliberately *not* an Auto Scaling Group or real
+scaling system; it's a minimal demonstration that Jenkins can drive
+infrastructure-as-code.
+
+The Jenkins pipeline has an `INFRA_ACTION` dropdown:
+
+- `MAKE` runs `terraform apply`, then builds and deploys the application.
+- `DESTROY` runs `terraform destroy` and skips build, push, and deployment.
 
 Running the pipeline again doesn't create a second instance — Terraform
 converges to the same declared state each time (that's normal, correct
@@ -88,7 +94,9 @@ Or just check the AWS Console — you should see one instance tagged
 ## Cleaning up
 
 This creates a real, billed EC2 instance. To remove it when you're done
-demonstrating:
+demonstrating, choose `DESTROY` in Jenkins and click **Build**. Terraform
+uses the state in the Jenkins job workspace, so run `DESTROY` from the same
+Jenkins job that ran `MAKE`.
 
 ```bash
 docker run --rm -v $(pwd):/workspace -w /workspace --entrypoint /bin/sh \
