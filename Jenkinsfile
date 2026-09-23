@@ -1,4 +1,5 @@
 import groovy.json.JsonSlurperClassic
+import groovy.transform.Field
 
 // Posts a message to the Google Chat space configured via the
 // 'google-chat-webhook' Secret text credential. Never fails the build if
@@ -15,8 +16,14 @@ def notifyGoogleChat(String message) {
     }
 }
 
-def stageDurations = [:]
-def instanceDetails = [:]
+// @Field is required here, not just a plain top-level `def` -- under
+// Jenkins' CPS sandbox, a plain top-level `def` is a script-run() local,
+// not a real field, so mutating it from inside a called function
+// (timedStage) fails with "No such property: stageDurations for class:
+// groovy.lang.Binding". @Field makes it an actual field of the generated
+// script class, reliably accessible from anywhere in the file.
+@Field def stageDurations = [:]
+@Field def instanceDetails = [:]
 // Uses Date instead of System.nanoTime()/currentTimeMillis() -- Jenkins'
 // script security sandbox rejects raw java.lang.System static calls by
 // default (needs manual admin approval in "In-process Script Approval"),
