@@ -1,4 +1,3 @@
-import groovy.json.JsonSlurperClassic
 import groovy.transform.Field
 
 // Posts a message to the Google Chat space configured via the
@@ -220,10 +219,23 @@ pipeline {
                                 docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest apply -auto-approve -input=false -replace=tls_private_key.demo -replace=aws_key_pair.demo -replace=aws_instance.demo -var=build_number=${BUILD_NUMBER} -var=server_number=${params.SERVER_NUMBER}
                                 docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest output -raw private_key_pem > terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem
                             """
-                            instanceDetails = new JsonSlurperClassic().parseText(sh(
-                                returnStdout: true,
-                                script: "docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest output -json"
-                            ).trim())
+                            // Individual -raw calls instead of parsing `terraform output -json`
+                            // with a Groovy JSON library -- Jenkins' script sandbox rejects
+                            // `new groovy.json.JsonSlurperClassic()` (needs manual admin
+                            // approval), so this avoids that dependency entirely.
+                            def tfOutput = { String name ->
+                                sh(
+                                    returnStdout: true,
+                                    script: "docker run --rm -v jenkins_home:/var/jenkins_home -w ${WORKSPACE}/terraform hashicorp/terraform:latest output -raw ${name}"
+                                ).trim()
+                            }
+                            instanceDetails = [
+                                instance_id:       [value: tfOutput('instance_id')],
+                                public_ip:         [value: tfOutput('public_ip')],
+                                private_ip:        [value: tfOutput('private_ip')],
+                                availability_zone: [value: tfOutput('availability_zone')],
+                                key_name:          [value: tfOutput('key_name')],
+                            ]
                             sh "chmod 600 terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem"
                             archiveArtifacts artifacts: "terraform/server-${params.SERVER_NUMBER}-build-${BUILD_NUMBER}.pem", fingerprint: true
                         }
