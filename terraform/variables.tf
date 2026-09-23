@@ -15,9 +15,10 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-variable "key_name" {
-  description = "Name of an existing EC2 key pair (not the .pem file itself, just its name in AWS)"
+variable "server_number" {
+  description = "Stable server number used in the generated AWS key-pair name and PEM filename"
   type        = string
+  default     = "1"
 }
 
 variable "security_group_id" {
