@@ -15,6 +15,25 @@ const HEALTH_ENDPOINTS = {
   'analytics-service': '/api/health/analytics-service',
 };
 
+function setTheme(theme) {
+  const isLight = theme === 'light';
+  document.documentElement.dataset.theme = isLight ? 'light' : 'dark';
+  const toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+  toggle.setAttribute('aria-pressed', String(isLight));
+  toggle.setAttribute('aria-label', isLight ? 'Switch to dark mode' : 'Switch to light mode');
+  toggle.querySelector('.theme-toggle-icon').textContent = isLight ? '☾' : '☀';
+  toggle.querySelector('.theme-toggle-label').textContent = isLight ? 'Dark mode' : 'Light mode';
+}
+
+const savedTheme = localStorage.getItem('dashboard-theme');
+setTheme(savedTheme === 'light' ? 'light' : 'dark');
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const nextTheme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  localStorage.setItem('dashboard-theme', nextTheme);
+  setTheme(nextTheme);
+});
+
 function buildHealthGrid() {
   const grid = document.getElementById('health-grid');
   grid.innerHTML = Object.keys(HEALTH_ENDPOINTS).map(service => `
