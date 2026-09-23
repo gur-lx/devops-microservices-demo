@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentation &mdash; Microservices DevOps Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="docs.css">
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem('dashboard-theme') === 'light') {
+        document.documentElement.dataset.theme = 'light';
+      }
+    } catch (error) {
+      // The docs page still defaults to dark mode when storage is unavailable.
+    }
+  }());
+</script>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">&lt;/&gt;</span>
+    <div>
+      <h1>Project Documentation</h1>
+      <p class="tagline">How this webpage works &middot; the DevOps pipeline &middot; the config files, explained</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <a class="pipeline-chip pipeline-chip-link" href="/">
+      <span class="section-icon">&#8592;</span> Back to Dashboard
+    </a>
+    <a class="pipeline-chip pipeline-chip-link" href="/api-docs" target="_blank" rel="noopener">
+      <span class="section-icon">&#128220;</span> API Docs (Swagger)
+    </a>
+    <button class="theme-toggle pipeline-chip" id="theme-toggle" type="button" aria-label="Switch to light mode" aria-pressed="false">
+      <span class="theme-toggle-icon" aria-hidden="true">&#9728;</span>
+      <span class="theme-toggle-label">Light mode</span>
+    </button>
+  </div>
+</header>
+
+<main class="docs-main">
+
+  <!-- Table of contents -->
+  <nav class="docs-toc panel" aria-label="Table of contents">
+    <h2><span class="section-icon">&#128278;</span> On this page</h2>
+    <ol class="toc-list">
+      <li><a href="#overview">1. What this project is</a></li>
+      <li><a href="#how-page-works">2. How the dashboard webpage works</a></li>
+      <li><a href="#architecture">3. Architecture &amp; request flow</a></li>
+      <li><a href="#pipeline">4. The DevOps pipeline, stage by stage</a></li>
+      <li><a href="#config">5. Config files, explained</a></li>
+      <li><a href="#glossary">6. Glossary of DevOps terms</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. Overview -->
+  <section class="panel docs-section" id="overview">
+    <h2><span class="section-icon">&#127919;</span> 1. What this project is</h2>
+    <p class="docs-p">
+      This is a <strong>DevOps CI/CD training project</strong>: a small e-commerce
+      style platform that is deliberately split into a public
+      <span class="tag">frontend</span> dashboard plus
+      <strong>12 backend microservices</strong> (user, product, order, cart,
+      inventory, payment, notification, review, auth, shipping, search and
+      analytics). Each service is a tiny Node.js / Express app running in its
+      own Docker container.
+    </p>
+    <p class="docs-p">
+      The application itself is intentionally simple. The <em>real</em> subject
+      of the project is everything <strong>around</strong> the app: how code
+      goes from a <code>git push</code> all the way to running containers on a
+      server, automatically, through a Jenkins pipeline &mdash; with code
+      scanning, image building, a container registry, automated deployment,
+      TLS certificates and monitoring along the way.
+    </p>
+    <div class="callout">
+      <span class="callout-icon">&#128161;</span>
+      <div>
+        <strong>One-line summary:</strong> the app is the excuse; the pipeline
+        is the lesson. Everything here exists to demonstrate a complete,
+        real-world CI/CD workflow.
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. How the page works -->
+  <section class="panel docs-section" id="how-page-works">
+    <h2><span class="section-icon">&#128421;</span> 2. How the dashboard webpage works</h2>
+    <p class="docs-p">
+      The dashboard is a plain HTML/CSS/JavaScript page (no framework) served
+      by Nginx from the <span class="tag">frontend</span> container. It talks to
+      the backend only through relative <code>/api/*</code> URLs, which Nginx
+      reverse-proxies to the API gateway. Here is what each part does:
+    </p>
+    <ul class="docs-list">
+      <li><strong>Deploy strip</strong> &mdash; shows the build number, domain and
+        service count, fetched from <code>/version</code> on the gateway.</li>
+      <li><strong>System Architecture diagram</strong> &mdash; a hand-drawn SVG that
+        maps the whole pipeline and the 12-service mesh.</li>
+      <li><strong>Live Service Health</strong> &mdash; every 8&nbsp;seconds the page
+        pings each service's <code>/api/health/&lt;service&gt;</code> endpoint,
+        measures latency, and colours the dot green (healthy) or red
+        (unreachable).</li>
+      <li><strong>API Console</strong> &mdash; the interactive part. When you click a
+        button it fires a <em>real</em> HTTP request through the stack and
+        animates the hop <code>browser &rarr; frontend &rarr; api-gateway &rarr;
+        service</code> and back, logging real status codes and latency. This
+        proves the microservices are actually talking to each other over the
+        Docker network.</li>
+      <li><strong>Data tables &amp; Platform Analytics</strong> &mdash; live data pulled
+        from the user, product, order, inventory and analytics services.</li>
+      <li><strong>Theme toggle</strong> &mdash; switches light/dark, remembered in
+        <code>localStorage</code>.</li>
+    </ul>
+    <p class="docs-p">
+      Key point: the browser never contacts the backend services directly.
+      Only the frontend is public (it terminates TLS via nginx-proxy in
+      production); every <code>/api/*</code> call is proxied to the internal
+      <span class="tag">api-gateway</span>, which then routes to the right
+      service on the private Docker network.
+    </p>
+  </section>
+
+  <!-- 3. Architecture -->
+  <section class="panel docs-section" id="architecture">
+    <h2><span class="section-icon">&#9881;</span> 3. Architecture &amp; request flow</h2>
+    <p class="docs-p">A single request from the browser travels like this:</p>
+    <div class="flow-chain">
+      <span class="chain-node">Browser</span>
+      <span class="chain-sep">&rarr;</span>
+      <span class="chain-node">nginx-proxy <small>(TLS / HTTPS)</small></span>
+      <span class="chain-sep">&rarr;</span>
+      <span class="chain-node">frontend <small>(Nginx :80)</small></span>
+      <span class="chain-sep">&rarr;</span>
+      <span class="chain-node">api-gateway <small>:8080</small></span>
+      <span class="chain-sep">&rarr;</span>
+      <span class="chain-node">a backend service <small>:3001&ndash;:3012</small></span>
+    </div>
+    <p class="docs-p">
+      The two <strong>build/deploy servers</strong> are separated on purpose:
+    </p>
+    <div class="two-col">
+      <div class="mini-card">
+        <h3>Server A &mdash; CI</h3>
+        <p>Runs Jenkins and SonarQube. Builds Docker images, scans code, and
+        pushes images to the registry. Never runs the app itself.</p>
+      </div>
+      <div class="mini-card">
+        <h3>Server B &mdash; Deploy</h3>
+        <p>Runs Docker Compose with the app plus nginx-proxy, acme-companion
+        (Let's Encrypt) and the monitoring agents. This is the only box the
+        public reaches.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Pipeline -->
+  <section class="panel docs-section" id="pipeline">
+    <h2><span class="section-icon">&#128640;</span> 4. The DevOps pipeline, stage by stage</h2>
+    <p class="docs-p">
+      A <code>git push</code> fires a GitHub webhook that triggers the Jenkins
+      pipeline defined in <code>Jenkinsfile</code>. It runs these stages in
+      order:
+    </p>
+
+    <ol class="stage-list">
+      <li class="stage">
+        <span class="stage-num">1</span>
+        <div class="stage-body">
+          <h3>Checkout</h3>
+          <p>Jenkins pulls the latest code from the Git repository for this build.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage-num">2</span>
+        <div class="stage-body">
+          <h3>SonarQube Analysis <span class="tag tag-quality">quality</span></h3>
+          <p>Static code analysis scans <code>services/</code> for bugs, code
+          smells and security issues, and reports them to the SonarQube server.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage-num">3</span>
+        <div class="stage-body">
+          <h3>Quality Gate <span class="tag tag-quality">gate</span></h3>
+          <p>The pipeline waits for SonarQube's verdict. If the code fails the
+          quality gate, the build is aborted &mdash; bad code never gets built or
+          deployed.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage-num">4</span>
+        <div class="stage-body">
+          <h3>Build images <span class="tag tag-build">build</span></h3>
+          <p><code>docker build</code> runs once per service (14 total),
+          tagging each image with the build number and <code>latest</code>.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage-num">5</span>
+        <div class="stage-body">
+          <h3>Push images <span class="tag tag-build">registry</span></h3>
+          <p>Jenkins logs in to Docker Hub and pushes every image so the
+          deploy server can pull them later.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage-num">6</span>
+        <div class="stage-body">
+          <h3>Deploy to server <span class="tag tag-deploy">deploy</span></h3>
+          <p>Jenkins SSHes into Server B, copies
+          <code>docker-compose.prod.yml</code>, then runs
+          <code>docker compose pull &amp;&amp; up -d</code> so the new images go
+          live with zero manual steps.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage-num">7</span>
+        <div class="stage-body">
+          <h3>Manage demo EC2 (Terraform) <span class="tag tag-infra">infra</span></h3>
+          <p>A demo Infrastructure-as-Code stage: Terraform provisions
+          (<code>BUILD</code>) or tears down (<code>DESTROY</code>) an AWS EC2
+          instance, proving Jenkins can drive infrastructure, not just code.</p>
+        </div>
+      </li>
+      <li class="stage">
+        <span class="stage-num">8</span>
+        <div class="stage-body">
+          <h3>Notify <span class="tag tag-notify">notify</span></h3>
+          <p>On success or failure, a message with stage timings and instance
+          details is posted to a Google Chat webhook.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="callout">
+      <span class="callout-icon">&#128273;</span>
+      <div>
+        <strong>Monitoring (always-on):</strong> Prometheus + Loki + Promtail
+        collect metrics and logs on the deploy server, while Grafana runs
+        off-server as a lightweight viewer that queries them over the network.
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Config files -->
+  <section class="panel docs-section" id="config">
+    <h2><span class="section-icon">&#128193;</span> 5. Config files, explained</h2>
+    <p class="docs-p">
+      These are the files that wire everything together. Read this as a map of
+      the repository.
+    </p>
+    <div class="config-grid">
+      <div class="config-card">
+        <code class="config-path">docker-compose.yml</code>
+        <p>Local development. <strong>Builds</strong> each service from source
+        and only exposes the frontend on port 8090. Everything else stays on the
+        internal <code>app-net</code> network.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">docker-compose.prod.yml</code>
+        <p>Production. <strong>Pulls</strong> prebuilt images from the registry
+        instead of building, and adds <code>nginx-proxy</code> +
+        <code>acme-companion</code> for automatic HTTPS via Let's Encrypt.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">Jenkinsfile</code>
+        <p>The CI/CD pipeline as code. Defines every stage from checkout to
+        deploy to Terraform, plus credentials and Google Chat notifications.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">services/frontend/nginx.conf</code>
+        <p>The frontend's Nginx config. Serves the dashboard and reverse-proxies
+        <code>/api/*</code>, <code>/gateway-health</code>, <code>/version</code>,
+        <code>/docs</code> and <code>/api-docs</code> to the gateway.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">.env.example</code>
+        <p>Template for environment variables (<code>REGISTRY</code>,
+        <code>IMAGE_TAG</code>, and in prod <code>DOMAIN</code> /
+        <code>LETSENCRYPT_EMAIL</code>). Copied to <code>.env</code> on the
+        server.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">ansible/</code>
+        <p>Playbooks that automate the two-server setup: install Docker, set up
+        Jenkins, create the deploy user. Uses <code>inventory.ini</code> and
+        <code>vars.yml</code>.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">monitoring/</code>
+        <p>Observability stack config: <code>prometheus.yml</code>,
+        <code>loki-config.yaml</code>, <code>promtail-config.yaml</code> and
+        Grafana provisioning for datasources and dashboards.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">scripts/deploy.sh</code>
+        <p>The manual deploy helper: <code>docker compose pull &amp;&amp; up
+        -d</code>. What Jenkins automates in the deploy stage.</p>
+      </div>
+      <div class="config-card">
+        <code class="config-path">services/&lt;name&gt;/Dockerfile</code>
+        <p>Per-service build recipe: how each microservice's Docker image is
+        assembled from its Node.js source.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Glossary -->
+  <section class="panel docs-section" id="glossary">
+    <h2><span class="section-icon">&#128218;</span> 6. Glossary of DevOps terms</h2>
+    <dl class="glossary">
+      <div class="term">
+        <dt>CI/CD</dt>
+        <dd>Continuous Integration / Continuous Deployment &mdash; automatically
+        building, testing and shipping code every time it changes.</dd>
+      </div>
+      <div class="term">
+        <dt>Pipeline</dt>
+        <dd>The ordered set of automated stages (build, test, deploy&hellip;) that
+        code passes through, defined here in the <code>Jenkinsfile</code>.</dd>
+      </div>
+      <div class="term">
+        <dt>Microservice</dt>
+        <dd>A small, independent service that does one job and talks to others
+        over the network, instead of one large monolithic app.</dd>
+      </div>
+      <div class="term">
+        <dt>API Gateway</dt>
+        <dd>A single entry point that receives all API requests and routes them
+        to the correct backend service.</dd>
+      </div>
+      <div class="term">
+        <dt>Container / Image</dt>
+        <dd>An <em>image</em> is a packaged, runnable snapshot of a service; a
+        <em>container</em> is a running instance of that image.</dd>
+      </div>
+      <div class="term">
+        <dt>Registry</dt>
+        <dd>A store for Docker images (here, Docker Hub). Jenkins pushes images
+        to it; the deploy server pulls from it.</dd>
+      </div>
+      <div class="term">
+        <dt>Docker Compose</dt>
+        <dd>A tool that runs a set of containers together from one YAML file,
+        wiring up their networks and environment.</dd>
+      </div>
+      <div class="term">
+        <dt>Webhook</dt>
+        <dd>An automatic HTTP callback. GitHub calls Jenkins on every push so
+        the pipeline starts on its own.</dd>
+      </div>
+      <div class="term">
+        <dt>Quality Gate</dt>
+        <dd>A pass/fail threshold from SonarQube. Failing it stops the pipeline
+        before anything is deployed.</dd>
+      </div>
+      <div class="term">
+        <dt>Infrastructure as Code (IaC)</dt>
+        <dd>Managing servers and cloud resources through code (Terraform,
+        Ansible) instead of clicking in a console.</dd>
+      </div>
+      <div class="term">
+        <dt>Reverse proxy</dt>
+        <dd>A server (Nginx) that receives requests and forwards them to
+        internal services, hiding them from the public internet.</dd>
+      </div>
+      <div class="term">
+        <dt>TLS / Let's Encrypt</dt>
+        <dd>TLS provides HTTPS encryption; Let's Encrypt issues the
+        certificates automatically via <code>acme-companion</code>.</dd>
+      </div>
+      <div class="term">
+        <dt>Observability</dt>
+        <dd>Seeing inside a running system: metrics (Prometheus), logs (Loki +
+        Promtail) and dashboards (Grafana).</dd>
+      </div>
+    </dl>
+  </section>
+
+</main>
+
+<footer>
+  <p>College DevOps Training Project &mdash; documentation</p>
+  <p class="footer-author">Built by Gurpiyar Singh</p>
+</footer>
+
+<script>
+  // Theme toggle: mirror the dashboard's behaviour so the setting is shared.
+  function setTheme(theme) {
+    const isLight = theme === 'light';
+    document.documentElement.dataset.theme = isLight ? 'light' : 'dark';
+    const toggle = document.getElementById('theme-toggle');
+    if (!toggle) return;
+    toggle.setAttribute('aria-pressed', String(isLight));
+    toggle.setAttribute('aria-label', isLight ? 'Switch to dark mode' : 'Switch to light mode');
+    toggle.querySelector('.theme-toggle-icon').textContent = isLight ? '\u263e' : '\u2600';
+    toggle.querySelector('.theme-toggle-label').textContent = isLight ? 'Dark mode' : 'Light mode';
+  }
+  const savedTheme = localStorage.getItem('dashboard-theme');
+  setTheme(savedTheme === 'light' ? 'light' : 'dark');
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const nextTheme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    localStorage.setItem('dashboard-theme', nextTheme);
+    setTheme(nextTheme);
+  });
+</script>
+</body>
+</html>
