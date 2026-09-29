@@ -4,25 +4,19 @@ const rows = document.getElementById('user-rows');
 const message = document.getElementById('admin-message');
 let me = null;
 let pendingDelete = null;
+let lastUsers = [];
 
 function showMessage(text, kind) {
-  message.textContent = text;
-  message.className = kind ? 'auth-message is-' + kind : 'auth-message';
+  window.portal.showMessage(message, text, kind);
 }
 
-async function api(path, options = {}) {
-  const res = await fetch(`/api/auth${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-  });
-  if (res.status === 401) {
-    location.href = '/login?next=/admin';
-    throw new Error('not signed in');
+async function api(path, options) {
+  try {
+    return await window.portal.api(path, options);
+  } catch (err) {
+    if (err.status === 401) location.href = '/login?next=/admin';
+    throw err;
   }
-  if (res.status === 204) return null;
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `request failed (${res.status})`);
-  return body;
 }
 
 // Mirrors the server's rules so locked rows show as read-only.
@@ -83,7 +77,6 @@ function actionCell(user, locked) {
   return button;
 }
 
-let lastUsers = [];
 
 function render(users) {
   lastUsers = users;

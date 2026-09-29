@@ -4,16 +4,19 @@
   const slot = document.getElementById('session-slot');
   if (!slot) return;
 
-  function link(href, html) {
+  function link(href, icon, text) {
     const a = document.createElement('a');
     a.className = 'pipeline-chip pipeline-chip-link';
     a.href = href;
-    a.innerHTML = html;
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'section-icon';
+    iconSpan.textContent = icon;
+    a.append(iconSpan, ' ' + text);
     return a;
   }
 
   function signedOut() {
-    slot.replaceChildren(link('/login', '<span class="section-icon">&#128100;</span> Sign in'));
+    slot.replaceChildren(link('/login', '\u{1F464}', 'Sign in'));
   }
 
   function signedIn(user) {
@@ -42,7 +45,7 @@
     });
 
     const items = [chip];
-    if (user.role === 'admin') items.push(link('/admin', '<span class="section-icon">&#128273;</span> Access management'));
+    if (user.role === 'admin') items.push(link('/admin', '\u{1F511}', 'Access management'));
     items.push(out);
     slot.replaceChildren(...items);
   }
