@@ -232,8 +232,8 @@ module.exports = {
         properties: { productId: { type: 'integer', example: 1 }, rating: { type: 'integer', example: 5 }, comment: { type: 'string', example: 'Great keyboard' } },
       },
 
-      RegisterRequest: { type: 'object', required: ['username', 'email', 'password'], properties: { username: { type: 'string', example: 'demo_user' }, email: { type: 'string', example: 'demo@example.com' }, password: { type: 'string', minLength: 8, example: 'changeme123' } } },
-      LoginRequest: { type: 'object', required: ['username', 'password'], properties: { username: { type: 'string', description: 'username or email', example: 'demo_user' }, password: { type: 'string', example: 'changeme123' } } },
+      RegisterRequest: { type: 'object', required: ['username', 'email', 'password'], properties: { username: { type: 'string', example: 'demo_user' }, email: { type: 'string', example: 'demo@example.com' }, password: { type: 'string', format: 'password', minLength: 8 } } },
+      LoginRequest: { type: 'object', required: ['username', 'password'], properties: { username: { type: 'string', description: 'username or email', example: 'demo_user' }, password: { type: 'string', format: 'password' } } },
       Account: { type: 'object', properties: { id: { type: 'integer' }, username: { type: 'string' }, email: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' }, lastLoginAt: { type: 'string', format: 'date-time', nullable: true } } },
       LoginResponse: { type: 'object', properties: { token: { type: 'string', description: 'JWT, send as Authorization: Bearer <token>' }, user: { $ref: '#/components/schemas/Account' } } },
 

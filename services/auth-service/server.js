@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 3009;
 const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_TTL = process.env.TOKEN_TTL || '8h';
@@ -19,7 +20,19 @@ const pool = new Pool();
 
 app.use(express.json());
 
-const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
+const USERNAME_RE = /^[\w.-]{3,32}$/;
+const JWT_ALGORITHM = 'HS256';
+
+// Plain string checks instead of a regex, so long input can't cause
+// catastrophic backtracking.
+function isValidEmail(email) {
+  if (email.length > 255 || /\s/.test(email)) return false;
+  const at = email.indexOf('@');
+  if (at < 1 || at !== email.lastIndexOf('@')) return false;
+  const domain = email.slice(at + 1);
+  const dot = domain.lastIndexOf('.');
+  return dot > 0 && dot < domain.length - 1;
+}
 
 async function initDb() {
   // Postgres may still be starting when this container comes up.
@@ -49,14 +62,14 @@ function publicUser(row) {
 }
 
 function signToken(row) {
-  return jwt.sign({ sub: row.id, username: row.username }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+  return jwt.sign({ sub: row.id, username: row.username }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: TOKEN_TTL });
 }
 
 function requireAuth(req, res, next) {
   const [scheme, token] = (req.headers.authorization || '').split(' ');
   if (scheme !== 'Bearer' || !token) return res.status(401).json({ error: 'missing token' });
   try {
-    req.auth = jwt.verify(token, JWT_SECRET);
+    req.auth = jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] });
     next();
   } catch {
     res.status(401).json({ error: 'invalid or expired token' });
@@ -78,7 +91,7 @@ app.post('/register', async (req, res) => {
   const password = String(req.body?.password || '');
 
   if (!USERNAME_RE.test(username)) return res.status(400).json({ error: 'username must be 3-32 letters, digits, _ . or -' });
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'a valid email is required' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'a valid email is required' });
   if (password.length < 8) return res.status(400).json({ error: 'password must be at least 8 characters' });
 
   try {
