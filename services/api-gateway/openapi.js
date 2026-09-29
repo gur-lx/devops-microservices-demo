@@ -141,13 +141,34 @@ module.exports = {
       },
     },
 
+    '/api/auth/register': {
+      post: {
+        tags: ['auth'], summary: 'Create an account (stored in PostgreSQL) and receive a JWT',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterRequest' } } } },
+        responses: {
+          201: { description: 'Created', content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } } },
+          400: badRequest,
+          409: { description: 'Username or email already registered', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+    },
     '/api/auth/login': {
       post: {
-        tags: ['auth'], summary: 'Log in and receive a mock token',
+        tags: ['auth'], summary: 'Log in with username or email and receive a JWT',
         requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginRequest' } } } },
         responses: {
           200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } } },
           401: { description: 'Invalid credentials', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        },
+      },
+    },
+    '/api/auth/me': {
+      get: {
+        tags: ['auth'], summary: 'Get the signed-in user',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: itemResponse('Account'),
+          401: { description: 'Missing, invalid or expired token', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
         },
       },
     },
@@ -172,6 +193,7 @@ module.exports = {
     },
   },
   components: {
+    securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
     schemas: {
       Health: { type: 'object', properties: { status: { type: 'string', example: 'ok' }, service: { type: 'string' } } },
       Error: { type: 'object', properties: { error: { type: 'string' } } },
@@ -210,8 +232,10 @@ module.exports = {
         properties: { productId: { type: 'integer', example: 1 }, rating: { type: 'integer', example: 5 }, comment: { type: 'string', example: 'Great keyboard' } },
       },
 
-      LoginRequest: { type: 'object', required: ['username', 'password'], properties: { username: { type: 'string', example: 'alice' }, password: { type: 'string', example: 'password1' } } },
-      LoginResponse: { type: 'object', properties: { token: { type: 'string' }, username: { type: 'string' } } },
+      RegisterRequest: { type: 'object', required: ['username', 'email', 'password'], properties: { username: { type: 'string', example: 'demo_user' }, email: { type: 'string', example: 'demo@example.com' }, password: { type: 'string', minLength: 8, example: 'changeme123' } } },
+      LoginRequest: { type: 'object', required: ['username', 'password'], properties: { username: { type: 'string', description: 'username or email', example: 'demo_user' }, password: { type: 'string', example: 'changeme123' } } },
+      Account: { type: 'object', properties: { id: { type: 'integer' }, username: { type: 'string' }, email: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' }, lastLoginAt: { type: 'string', format: 'date-time', nullable: true } } },
+      LoginResponse: { type: 'object', properties: { token: { type: 'string', description: 'JWT, send as Authorization: Bearer <token>' }, user: { $ref: '#/components/schemas/Account' } } },
 
       Shipment: { type: 'object', properties: { id: { type: 'integer' }, orderId: { type: 'integer' }, carrier: { type: 'string' }, status: { type: 'string' } } },
 

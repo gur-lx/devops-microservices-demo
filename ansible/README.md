@@ -76,3 +76,72 @@ Every task here is idempotent (`creates:` guards, `when: ... rc != 0`
 checks) — safe to re-run `ansible-playbook site.yml` any time, e.g. after
 pulling repo changes, without recreating the Jenkins container or
 regenerating the SSH key.
+
+## 3. Daily backups to S3 (optional)
+
+`playbook-backup.yml` installs [`scripts/backup-to-s3.sh`](../scripts/backup-to-s3.sh)
+on the deploy server and runs it from root's crontab every day (default
+06:25 server time). Each run archives `deploy_path` (compose file + `.env`)
+a `pg_dumpall` of every PostgreSQL container in the project (the login
+portal's `auth-db`), and every other Docker volume of the compose project
+(TLS certs, acme state), then uploads one tarball to
+`s3://<bucket>/<prefix>/<hostname>/YYYY/MM/<hostname>-<timestamp>.tar.gz`.
+
+1. Create the bucket (block public access, turn on default encryption), and
+   add a lifecycle rule to expire old backups, e.g. after 30 days:
+
+   ```bash
+   aws s3api create-bucket --bucket my-app-backups --region ap-south-1 \
+     --create-bucket-configuration LocationConstraint=ap-south-1
+   aws s3api put-public-access-block --bucket my-app-backups \
+     --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+   aws s3api put-bucket-lifecycle-configuration --bucket my-app-backups \
+     --lifecycle-configuration '{"Rules":[{"ID":"expire-backups","Status":"Enabled","Filter":{"Prefix":"backups/"},"Expiration":{"Days":30}}]}'
+   ```
+
+2. Give the deploy server's EC2 instance an IAM role (no access keys on the
+   box) with this policy:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Effect": "Allow",
+       "Action": ["s3:PutObject"],
+       "Resource": "arn:aws:s3:::my-app-backups/backups/*"
+     }]
+   }
+   ```
+
+3. Set `backup_s3_bucket` (and optionally the schedule) in `vars.yml`, then:
+
+   ```bash
+   ansible-playbook playbook-backup.yml
+   ```
+
+4. Check it on the server:
+
+   ```bash
+   sudo /usr/local/bin/backup-to-s3.sh      # run once by hand
+   sudo crontab -l                          # confirm the schedule
+   tail -f /var/log/backup-to-s3.log        # cron output
+   ```
+
+Restore: `aws s3 cp s3://.../<file>.tar.gz . && tar xzf <file>.tar.gz`, then
+extract `files/*.tar.gz` with `tar -C / -xzf` and each `volumes/<vol>.tar.gz`
+into its volume via `docker run --rm -v <vol>:/data -v $PWD/volumes:/in alpine tar -C /data -xzf /in/<vol>.tar.gz`.
+Restore the login database from its dump with
+`gunzip -c databases/<auth-db container>.sql.gz | docker exec -i <auth-db container> psql -U auth -d postgres`.
+
+### Success / failure alerts (SNS email)
+
+Set `backup_sns_topic_arn` in `vars.yml` and cron runs
+[`scripts/backup-with-alert.sh`](../scripts/backup-with-alert.sh) instead,
+which runs the backup and publishes `[backup] SUCCESS|FAILED on <host>` with
+the log tail to that SNS topic. Create a Standard topic, add email
+subscriptions (each recipient must click the confirmation link), and add this
+statement to the instance role's policy:
+
+```json
+{ "Effect": "Allow", "Action": "sns:Publish", "Resource": "<topic ARN>" }
+```

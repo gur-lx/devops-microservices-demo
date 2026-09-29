@@ -84,8 +84,33 @@ services:
     networks:
       - app-net
 
+  auth-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=authdb
+      - POSTGRES_USER=auth
+      - POSTGRES_PASSWORD=${AUTH_DB_PASSWORD:-devpassword}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth -d authdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-net
+
   auth-service:
     build: ./services/auth-service
+    environment:
+      - PGHOST=auth-db
+      - PGDATABASE=authdb
+      - PGUSER=auth
+      - PGPASSWORD=${AUTH_DB_PASSWORD:-devpassword}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-secret}
+    depends_on:
+      auth-db:
+        condition: service_healthy
     networks:
       - app-net
 
@@ -107,3 +132,6 @@ services:
 networks:
   app-net:
     driver: bridge
+
+volumes:
+  auth-db-data:

@@ -1,0 +1,95 @@
+---
+# Installs scripts/backup-to-s3.sh on the deploy server and schedules it
+# daily via cron. Set backup_s3_bucket in vars.yml first.
+#
+# The EC2 instance needs an IAM role allowing s3:PutObject on
+# arn:aws:s3:::<bucket>/<prefix>/* — see ansible/README.md.
+- hosts: deploy_server
+  become: true
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Fail early if the bucket isn't configured
+      assert:
+        that: backup_s3_bucket is defined and backup_s3_bucket | length > 0
+        fail_msg: "Set backup_s3_bucket in ansible/vars.yml"
+
+    - name: Install backup dependencies
+      apt:
+        name:
+          - unzip
+          - curl
+          - util-linux   # flock
+        state: present
+        update_cache: true
+
+    - name: Check if the AWS CLI is installed
+      command: which aws
+      register: aws_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install AWS CLI v2
+      shell: |
+        set -e
+        cd /tmp
+        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o awscliv2.zip
+        unzip -qo awscliv2.zip
+        ./aws/install --update
+        rm -rf aws awscliv2.zip
+      args:
+        executable: /bin/bash
+      when: aws_check.rc != 0
+
+    - name: Install backup script
+      copy:
+        src: ../scripts/backup-to-s3.sh
+        dest: /usr/local/bin/backup-to-s3.sh
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install alert wrapper
+      copy:
+        src: ../scripts/backup-with-alert.sh
+        dest: /usr/local/bin/backup-with-alert.sh
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Write backup config
+      copy:
+        dest: /etc/backup-to-s3.conf
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          S3_BUCKET="{{ backup_s3_bucket }}"
+          S3_PREFIX="{{ backup_s3_prefix }}"
+          BACKUP_PATHS="{{ deploy_path }}"
+          DOCKER_VOLUMES="auto"
+          COMPOSE_PROJECT="{{ deploy_path | basename }}"
+          LOCAL_KEEP_DAYS="{{ backup_local_keep_days }}"
+          SNS_TOPIC_ARN="{{ backup_sns_topic_arn }}"
+
+    - name: Schedule daily backup
+      cron:
+        name: "daily backup to s3"
+        user: root
+        minute: "{{ backup_cron_minute }}"
+        hour: "{{ backup_cron_hour }}"
+        job: "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin /usr/local/bin/{{ 'backup-with-alert.sh' if backup_sns_topic_arn else 'backup-to-s3.sh' }} >> /var/log/backup-to-s3.log 2>&1"
+
+    - name: Rotate the backup log
+      copy:
+        dest: /etc/logrotate.d/backup-to-s3
+        mode: "0644"
+        content: |
+          /var/log/backup-to-s3.log {
+            weekly
+            rotate 8
+            compress
+            missingok
+            notifempty
+          }

@@ -6,6 +6,7 @@ COPY docs.html /usr/share/nginx/html/docs.html
 COPY style.css /usr/share/nginx/html/style.css
 COPY docs.css /usr/share/nginx/html/docs.css
 COPY app.js /usr/share/nginx/html/app.js
+COPY login.html login.css login.js /usr/share/nginx/html/
 
 EXPOSE 80
 
