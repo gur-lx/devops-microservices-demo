@@ -17,7 +17,7 @@ function setToken(token) {
 
 function showMessage(text, kind) {
   message.textContent = text;
-  message.className = `auth-message ${kind ? `is-${kind}` : ''}`;
+  message.className = kind ? 'auth-message is-' + kind : 'auth-message';
 }
 
 function showTab(name) {
