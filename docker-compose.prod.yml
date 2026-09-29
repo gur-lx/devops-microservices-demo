@@ -140,8 +140,36 @@ services:
       - app-net
     restart: unless-stopped
 
+  # Login portal database. AUTH_DB_PASSWORD and JWT_SECRET must be set in
+  # the .env file next to this compose file on the server (never in git).
+  auth-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=authdb
+      - POSTGRES_USER=auth
+      - POSTGRES_PASSWORD=${AUTH_DB_PASSWORD:?set AUTH_DB_PASSWORD in .env}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth -d authdb"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-net
+    restart: unless-stopped
+
   auth-service:
     image: ${REGISTRY}/auth-service:${IMAGE_TAG:-latest}
+    environment:
+      - PGHOST=auth-db
+      - PGDATABASE=authdb
+      - PGUSER=auth
+      - PGPASSWORD=${AUTH_DB_PASSWORD:?set AUTH_DB_PASSWORD in .env}
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env}
+    depends_on:
+      auth-db:
+        condition: service_healthy
     networks:
       - app-net
     restart: unless-stopped
@@ -173,3 +201,4 @@ volumes:
   vhost:
   html:
   acme:
+  auth-db-data:

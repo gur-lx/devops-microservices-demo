@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in · Microservices DevOps Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="login.css">
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem('dashboard-theme') === 'light') {
+        document.documentElement.dataset.theme = 'light';
+      }
+    } catch (error) {
+      // Defaults to dark mode when storage is unavailable.
+    }
+  }());
+</script>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<header class="topbar">
+  <a class="brand brand-link" href="/">
+    <span class="brand-mark">&lt;/&gt;</span>
+    <div>
+      <h1>Microservices DevOps Dashboard</h1>
+      <p class="tagline">User portal &mdash; auth-service &middot; PostgreSQL &middot; JWT</p>
+    </div>
+  </a>
+  <div class="topbar-actions">
+    <a class="pipeline-chip pipeline-chip-link" href="/">&larr; Dashboard</a>
+  </div>
+</header>
+
+<main class="auth-main">
+
+  <section class="panel auth-card" id="auth-forms">
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab is-active" id="tab-login" type="button" role="tab" aria-selected="true" aria-controls="login-form">Sign in</button>
+      <button class="auth-tab" id="tab-register" type="button" role="tab" aria-selected="false" aria-controls="register-form">Create account</button>
+    </div>
+
+    <form id="login-form" class="auth-form" novalidate>
+      <label for="login-username">Username or email</label>
+      <input id="login-username" name="username" autocomplete="username" required>
+      <label for="login-password">Password</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+      <button class="api-btn api-btn-accent auth-submit" type="submit">Sign in</button>
+    </form>
+
+    <form id="register-form" class="auth-form" novalidate hidden>
+      <label for="reg-username">Username</label>
+      <input id="reg-username" name="username" autocomplete="username" minlength="3" maxlength="32" required>
+      <span class="auth-hint">3&ndash;32 letters, digits, <code>_ . -</code></span>
+      <label for="reg-email">Email</label>
+      <input id="reg-email" name="email" type="email" autocomplete="email" required>
+      <label for="reg-password">Password</label>
+      <input id="reg-password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+      <span class="auth-hint">At least 8 characters</span>
+      <button class="api-btn api-btn-accent auth-submit" type="submit">Create account</button>
+    </form>
+
+    <p class="auth-message" id="auth-message" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="panel auth-card" id="profile" hidden>
+    <h2><span class="dot dot-ok"></span> Signed in</h2>
+    <dl class="profile-list">
+      <div><dt>Username</dt><dd id="p-username"></dd></div>
+      <div><dt>Email</dt><dd id="p-email"></dd></div>
+      <div><dt>Member since</dt><dd id="p-created"></dd></div>
+      <div><dt>Last sign-in</dt><dd id="p-last"></dd></div>
+    </dl>
+    <button class="api-btn" id="logout" type="button">Sign out</button>
+  </section>
+
+</main>
+
+<script src="login.js"></script>
+</body>
+</html>
