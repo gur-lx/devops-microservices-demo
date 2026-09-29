@@ -604,3 +604,24 @@ footer code {
   color: var(--text-dim);
   opacity: 0.8;
 }
+
+/* Signed-in user chip in the header (session.js) */
+.session-slot { display: contents; }
+.session-chip { color: var(--text); }
+.session-chip strong { font-weight: 700; }
+.session-role {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-2);
+  border: 1px solid var(--accent-2);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.session-signout {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.session-signout:hover, .session-signout:focus-visible { color: var(--text); border-color: var(--bad); outline: none; }

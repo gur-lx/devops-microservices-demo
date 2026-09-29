@@ -140,7 +140,7 @@ services:
       - app-net
     restart: unless-stopped
 
-  # Login portal database. AUTH_DB_PASSWORD and JWT_SECRET must be set in
+  # Login portal database. AUTH_DB_PASSWORD, JWT_SECRET and ADMIN_PASSWORD must be set in
   # the .env file next to this compose file on the server (never in git).
   auth-db:
     image: postgres:16-alpine
@@ -167,6 +167,9 @@ services:
       - PGUSER=auth
       - PGPASSWORD=${AUTH_DB_PASSWORD:?set AUTH_DB_PASSWORD in .env}
       - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@${DOMAIN:-localhost.localdomain}}
+      - COOKIE_SECURE=true
     depends_on:
       auth-db:
         condition: service_healthy

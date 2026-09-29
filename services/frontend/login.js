@@ -1,19 +1,13 @@
-const TOKEN_KEY = 'auth-token';
-
+// Sign-in page. The session lives in an HttpOnly cookie set by
+// auth-service, so this script never stores the token itself.
 const $ = id => document.getElementById(id);
 const message = $('auth-message');
+const params = new URLSearchParams(location.search);
 
-function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
-}
-function setToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Without storage the user stays signed in only until the page reloads.
-  }
-}
+// Only follow same-site paths like "/docs", never "//evil.example".
+const nextPath = (params.get('next') || '').startsWith('/') && !(params.get('next') || '').startsWith('//')
+  ? params.get('next')
+  : null;
 
 function showMessage(text, kind) {
   message.textContent = text;
@@ -35,11 +29,21 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleString() : '—';
 }
 
+function roleLabel(user) {
+  if (user.isPrimaryAdmin) return 'Main admin';
+  return user.role === 'admin' ? 'Admin' : 'User';
+}
+
 function showProfile(user) {
+  $('p-title').textContent = user.username;
   $('p-username').textContent = user.username;
   $('p-email').textContent = user.email;
+  $('p-role').textContent = roleLabel(user);
+  $('p-docs').textContent = user.canViewDocs ? 'Allowed' : 'No access (ask an admin)';
   $('p-created').textContent = formatDate(user.createdAt);
   $('p-last').textContent = formatDate(user.lastLoginAt);
+  $('go-docs').hidden = !user.canViewDocs;
+  $('go-admin').hidden = user.role !== 'admin';
   $('auth-forms').hidden = true;
   $('profile').hidden = false;
 }
@@ -54,19 +58,22 @@ async function api(path, options = {}) {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
   });
+  if (res.status === 204) return null;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `request failed (${res.status})`);
   return body;
 }
 
 async function loadProfile() {
-  const token = getToken();
-  if (!token) return showForms();
   try {
-    showProfile(await api('/me', { headers: { Authorization: `Bearer ${token}` } }));
+    const user = await api('/me');
+    if (params.get('denied') === 'docs' && !user.canViewDocs) {
+      showMessage('Your account does not have access to the documentation yet. Ask an admin to allow it.', 'info');
+    }
+    showProfile(user);
   } catch {
-    setToken(null);
     showForms();
+    if (nextPath) showMessage('Sign in to continue.', 'info');
   }
 }
 
@@ -76,11 +83,11 @@ async function submit(form, path) {
   button.disabled = true;
   showMessage('Working…');
   try {
-    const result = await api(path, { method: 'POST', body: JSON.stringify(data) });
-    setToken(result.token);
+    await api(path, { method: 'POST', body: JSON.stringify(data) });
     form.reset();
-    showMessage('');
-    showProfile(result.user);
+    // A full page load so the header's "Signed in as" chip picks up the
+    // new session.
+    location.href = nextPath || '/login';
   } catch (err) {
     showMessage(err.message, 'error');
   } finally {
@@ -101,11 +108,9 @@ $('register-form').addEventListener('submit', e => {
   submit(e.target, '/register');
 });
 
-$('logout').addEventListener('click', () => {
-  setToken(null);
-  showForms();
-  showTab('login');
-  showMessage('Signed out.', 'ok');
+$('logout').addEventListener('click', async () => {
+  await api('/logout', { method: 'POST' }).catch(() => {});
+  location.href = '/login';
 });
 
 loadProfile();

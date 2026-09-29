@@ -21,6 +21,7 @@
     </div>
   </a>
   <div class="topbar-actions">
+    <div class="session-slot" id="session-slot"></div>
     <a class="pipeline-chip pipeline-chip-link" href="/">&larr; Dashboard</a>
   </div>
 </header>
@@ -57,18 +58,25 @@
   </section>
 
   <section class="panel auth-card" id="profile" hidden>
-    <h2><span class="dot dot-ok"></span> Signed in</h2>
+    <h2><span class="dot dot-ok"></span> Signed in as&nbsp;<span id="p-title"></span></h2>
     <dl class="profile-list">
       <div><dt>Username</dt><dd id="p-username"></dd></div>
       <div><dt>Email</dt><dd id="p-email"></dd></div>
+      <div><dt>Role</dt><dd id="p-role"></dd></div>
+      <div><dt>Documentation</dt><dd id="p-docs"></dd></div>
       <div><dt>Member since</dt><dd id="p-created"></dd></div>
       <div><dt>Last sign-in</dt><dd id="p-last"></dd></div>
     </dl>
-    <button class="api-btn" id="logout" type="button">Sign out</button>
+    <div class="profile-actions">
+      <a class="api-btn api-btn-accent" id="go-docs" href="/docs" hidden>Open documentation</a>
+      <a class="api-btn api-btn-accent" id="go-admin" href="/admin" hidden>Access management</a>
+      <button class="api-btn" id="logout" type="button">Sign out</button>
+    </div>
   </section>
 
 </main>
 
 <script src="login.js"></script>
+<script src="session.js"></script>
 </body>
 </html>
