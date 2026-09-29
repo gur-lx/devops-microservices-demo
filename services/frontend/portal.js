@@ -5,7 +5,7 @@ window.portal = {
   async api(path, options = {}) {
     const res = await fetch(`/api/auth${path}`, {
       ...options,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers: { 'Content-Type': 'application/json', ...options.headers },
     });
     if (res.status === 204) return null;
     const body = await res.json().catch(() => ({}));
