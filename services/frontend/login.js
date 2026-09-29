@@ -1,17 +1,19 @@
 // Sign-in page. The session lives in an HttpOnly cookie set by
 // auth-service, so this script never stores the token itself.
+const { api } = window.portal;
 const $ = id => document.getElementById(id);
 const message = $('auth-message');
 const params = new URLSearchParams(location.search);
 
 // Only follow same-site paths like "/docs", never "//evil.example".
-const nextPath = (params.get('next') || '').startsWith('/') && !(params.get('next') || '').startsWith('//')
-  ? params.get('next')
-  : null;
+function safeNext(value) {
+  if (!value?.startsWith('/') || value.startsWith('//')) return null;
+  return value;
+}
+const nextPath = safeNext(params.get('next'));
 
 function showMessage(text, kind) {
-  message.textContent = text;
-  message.className = kind ? 'auth-message is-' + kind : 'auth-message';
+  window.portal.showMessage(message, text, kind);
 }
 
 function showTab(name) {
@@ -51,17 +53,6 @@ function showProfile(user) {
 function showForms() {
   $('profile').hidden = true;
   $('auth-forms').hidden = false;
-}
-
-async function api(path, options = {}) {
-  const res = await fetch(`/api/auth${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-  });
-  if (res.status === 204) return null;
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `request failed (${res.status})`);
-  return body;
 }
 
 async function loadProfile() {

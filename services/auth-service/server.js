@@ -8,7 +8,6 @@ app.disable('x-powered-by');
 const PORT = process.env.PORT || 3009;
 const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_TTL_SECONDS = Number(process.env.TOKEN_TTL_SECONDS || 8 * 60 * 60);
-const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true';
 const COOKIE_NAME = 'session';
 
 // The main admin account. Its password is set from ADMIN_PASSWORD on every
@@ -111,7 +110,9 @@ function signToken(row) {
 function setSessionCookie(res, token) {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: COOKIE_SECURE,
+    // Browsers also accept Secure cookies on http://localhost, so this
+    // works for local development too.
+    secure: true,
     sameSite: 'lax',
     path: '/',
     maxAge: TOKEN_TTL_SECONDS * 1000,
@@ -229,7 +230,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.post('/logout', (req, res) => {
-  res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: COOKIE_SECURE, sameSite: 'lax', path: '/' });
+  res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
   res.status(204).end();
 });
 
