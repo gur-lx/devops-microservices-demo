@@ -173,6 +173,35 @@ module.exports = {
       },
     },
 
+    '/api/auth/logout': {
+      post: { tags: ['auth'], summary: 'Sign out (clears the session cookie)', responses: { 204: { description: 'Signed out' } } },
+    },
+    '/api/auth/authorize/{area}': {
+      get: {
+        tags: ['auth'], summary: 'Check page access (used by nginx auth_request)',
+        parameters: [{ name: 'area', in: 'path', required: true, schema: { type: 'string', enum: ['docs', 'admin'] } }],
+        responses: { 204: { description: 'Allowed' }, 401: { description: 'Not signed in' }, 403: { description: 'Signed in but not allowed' } },
+      },
+    },
+    '/api/auth/admin/users': {
+      get: { tags: ['auth'], summary: 'List all users (admins only)', security: [{ bearerAuth: [] }], responses: { 200: listResponse('Account'), 401: { description: 'Not signed in' }, 403: { description: 'Admins only' } } },
+    },
+    '/api/auth/admin/users/{id}': {
+      patch: {
+        tags: ['auth'], summary: "Change a user's role, documentation access or account status (admins only)",
+        description: 'Only the main admin can grant or remove admin rights or change other admins. The main admin account cannot be changed.',
+        security: [{ bearerAuth: [] }],
+        parameters: [idParam('user', 2)],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/AccessChange' } } } },
+        responses: { 200: itemResponse('Account'), 400: badRequest, 403: { description: 'Not allowed' }, 404: notFound },
+      },
+      delete: {
+        tags: ['auth'], summary: 'Delete a user (admins only)', security: [{ bearerAuth: [] }],
+        parameters: [idParam('user', 2)],
+        responses: { 204: { description: 'Deleted' }, 403: { description: 'Not allowed' }, 404: notFound },
+      },
+    },
+
     '/api/shipments': {
       get: { tags: ['shipping'], summary: 'List shipments', responses: { 200: listResponse('Shipment') } },
     },
@@ -234,7 +263,8 @@ module.exports = {
 
       RegisterRequest: { type: 'object', required: ['username', 'email', 'password'], properties: { username: { type: 'string', example: 'demo_user' }, email: { type: 'string', example: 'demo@example.com' }, password: { type: 'string', format: 'password', minLength: 8 } } },
       LoginRequest: { type: 'object', required: ['username', 'password'], properties: { username: { type: 'string', description: 'username or email', example: 'demo_user' }, password: { type: 'string', format: 'password' } } },
-      Account: { type: 'object', properties: { id: { type: 'integer' }, username: { type: 'string' }, email: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' }, lastLoginAt: { type: 'string', format: 'date-time', nullable: true } } },
+      Account: { type: 'object', properties: { id: { type: 'integer' }, username: { type: 'string' }, email: { type: 'string' }, role: { type: 'string', enum: ['user', 'admin'] }, isPrimaryAdmin: { type: 'boolean' }, canViewDocs: { type: 'boolean' }, isActive: { type: 'boolean' }, createdAt: { type: 'string', format: 'date-time' }, lastLoginAt: { type: 'string', format: 'date-time', nullable: true } } },
+      AccessChange: { type: 'object', properties: { role: { type: 'string', enum: ['user', 'admin'] }, canViewDocs: { type: 'boolean' }, isActive: { type: 'boolean' } } },
       LoginResponse: { type: 'object', properties: { token: { type: 'string', description: 'JWT, send as Authorization: Bearer <token>' }, user: { $ref: '#/components/schemas/Account' } } },
 
       Shipment: { type: 'object', properties: { id: { type: 'integer' }, orderId: { type: 'integer' }, carrier: { type: 'string' }, status: { type: 'string' } } },

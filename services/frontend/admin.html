@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Access management · Microservices DevOps Dashboard</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin.css">
+<script src="theme-init.js"></script>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<header class="topbar">
+  <a class="brand brand-link" href="/">
+    <span class="brand-mark">&lt;/&gt;</span>
+    <div>
+      <h1>Access management</h1>
+      <p class="tagline">Who can sign in, who can read the documentation, and who is an admin</p>
+    </div>
+  </a>
+  <div class="topbar-actions">
+    <div class="session-slot" id="session-slot"></div>
+    <a class="pipeline-chip pipeline-chip-link" href="/">&larr; Dashboard</a>
+  </div>
+</header>
+
+<main class="admin-main">
+  <section class="panel">
+    <h2><span class="section-icon">&#128273;</span> Users <span class="pill" id="user-count">loading…</span></h2>
+    <p class="admin-note" id="admin-note"></p>
+    <div class="admin-table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th scope="col">User</th>
+            <th scope="col">Role</th>
+            <th scope="col">Documentation</th>
+            <th scope="col">Account</th>
+            <th scope="col">Last sign-in</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="user-rows">
+          <tr><td colspan="6" class="loading-row">Loading users…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="auth-message" id="admin-message" role="status" aria-live="polite"></p>
+  </section>
+</main>
+
+<script src="admin.js"></script>
+<script src="session.js"></script>
+</body>
+</html>

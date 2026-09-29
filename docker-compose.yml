@@ -108,6 +108,7 @@ services:
       - PGUSER=auth
       - PGPASSWORD=${AUTH_DB_PASSWORD:-devpassword}
       - JWT_SECRET=${JWT_SECRET:-dev-only-secret}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin-dev-password}
     depends_on:
       auth-db:
         condition: service_healthy
