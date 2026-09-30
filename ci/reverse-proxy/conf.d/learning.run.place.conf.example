@@ -1,0 +1,72 @@
+# Load balancer for learning.run.place -- an "ALB" built from the nginx
+# reverse-proxy that already fronts jenkins.run.place on the Jenkins box.
+# TLS terminates here; each web server only serves plain HTTP on :8090
+# (APP_PORT in the Jenkinsfile), reached over the VPC's private network.
+#
+# Shipped as .example on purpose: nginx only loads *.conf, and a config
+# with placeholder IPs (or a missing cert) would stop nginx from starting --
+# which would take jenkins.run.place down with it. Fill in the IPs, get the
+# cert (ci/reverse-proxy/README.md, "Load balancer for learning.run.place"),
+# then copy this to learning.run.place.conf and reload nginx.
+
+upstream learning_app {
+    # Sticky by client IP. Each server has its own auth-db, so a session
+    # cookie issued by one server names a user id that may not exist in
+    # another server's database -- without stickiness, logins would appear
+    # to randomly break. Drop this once the servers share one database.
+    ip_hash;
+
+    # Same order as deployTargets in the Jenkinsfile. Private IPs; the
+    # security groups of server-1 and server-3 must allow TCP 8090 from the
+    # Jenkins box. server-2 is this box itself -- use its private IP, not
+    # 127.0.0.1 (that would be this nginx container).
+    #
+    # Passive health checks: after 3 failed requests within 30s a server
+    # is taken out of rotation for 30s, then retried.
+    server <SERVER_1_PRIVATE_IP>:8090 max_fails=3 fail_timeout=30s;
+    server <JENKINS_PRIVATE_IP>:8090  max_fails=3 fail_timeout=30s;
+    server <SERVER_3_PRIVATE_IP>:8090 max_fails=3 fail_timeout=30s;
+
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    server_name learning.run.place;
+
+    # Let's Encrypt HTTP-01 challenge -- must stay plain HTTP, not redirected.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name learning.run.place;
+
+    ssl_certificate     /etc/letsencrypt/live/learning.run.place/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/learning.run.place/privkey.pem;
+
+    location / {
+        proxy_pass http://learning_app;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # A server that is down or mid-deploy gets skipped for this request
+        # instead of returning an error to the user.
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+
+        # Which backend answered -- e.g. `curl -sI https://learning.run.place/`.
+        add_header X-Upstream $upstream_addr always;
+    }
+}

@@ -38,6 +38,63 @@ def timedStage(String name, Closure body) {
     }
 }
 
+// Every push deploys to these web servers, one after another, in this
+// order. If one fails (deploy or health check), the rest are skipped, so a
+// bad build never gets past the first server it breaks. The nginx load
+// balancer on the Jenkins box (ci/reverse-proxy/conf.d/learning.run.place.conf)
+// spreads learning.run.place across all three.
+//
+// `host` is the address as seen FROM the Jenkins container. server-2 is the
+// Jenkins box itself, so use its private IP there -- `localhost` would be
+// the Jenkins container, not the host.
+//
+// `profiles` is COMPOSE_PROFILES for that server. server-1 keeps its own
+// nginx-proxy + Let's Encrypt (the `standalone-tls` profile) so it keeps
+// serving learning.run.place directly until DNS is moved to the load
+// balancer -- after that cutover, set it to '' like the others.
+@Field def deployTargets = [
+    [name: 'server-1', host: '184.193.151.24',        user: 'ubuntu',   path: '/var/www/html/microservices-devops.app/devops-microservices-demo', profiles: 'standalone-tls'],
+    [name: 'server-2', host: '<JENKINS_PRIVATE_IP>',  user: 'deployer', path: '/opt/devops-microservices-demo', profiles: ''],
+    [name: 'server-3', host: '<SERVER_3_PRIVATE_IP>', user: 'deployer', path: '/opt/devops-microservices-demo', profiles: ''],
+]
+
+// Copies the prod compose file to one server, rolls it onto the new image
+// tag, then waits for the gateway health endpoint to answer. `docker
+// compose up -d` returns as soon as containers are created, so without the
+// health check a crash-looping build would still count as "deployed" and
+// roll on to the next server.
+def deployTo(Map target) {
+    def remote = "${target.user}@${target.host}"
+    def sshOpts = '-o StrictHostKeyChecking=no -o ConnectTimeout=15'
+    sshagent(credentials: ['deploy-server-ssh-key']) {
+        sh """
+            ssh ${sshOpts} ${remote} 'mkdir -p ${target.path}'
+            scp ${sshOpts} docker-compose.prod.yml ${remote}:${target.path}/docker-compose.yml
+            ssh ${sshOpts} ${remote} '\
+                cd ${target.path} && \
+                test -f .env || { echo "${target.name}: missing ${target.path}/.env (see ansible/README.md)" >&2; exit 1; } && \
+                export REGISTRY=${env.REGISTRY} IMAGE_TAG=${env.IMAGE_TAG} DOMAIN=${env.DOMAIN} && \
+                export LETSENCRYPT_EMAIL=${env.LETSENCRYPT_EMAIL} APP_PORT=${env.APP_PORT} && \
+                export SERVER_NAME=${target.name} COMPOSE_PROFILES=${target.profiles} && \
+                docker compose pull && \
+                docker compose up -d --remove-orphans && \
+                docker image prune -f \
+            '
+            ssh ${sshOpts} ${remote} '\
+                for i in \$(seq 1 30); do \
+                    if curl -fsS -o /dev/null http://localhost:${env.APP_PORT}/gateway-health; then \
+                        echo "${target.name} is healthy"; exit 0; \
+                    fi; \
+                    sleep 3; \
+                done; \
+                echo "${target.name} did not become healthy in 90s" >&2; \
+                cd ${target.path} && docker compose ps; \
+                exit 1 \
+            '
+        """
+    }
+}
+
 pipeline {
     agent any
 
@@ -59,11 +116,18 @@ pipeline {
         REGISTRY        = 'docker.io/gurlx'
         IMAGE_TAG       = "${env.BUILD_NUMBER}"
         SERVICES        = 'frontend api-gateway user-service product-service order-service cart-service inventory-service payment-service notification-service review-service auth-service shipping-service search-service analytics-service'
-        DEPLOY_HOST     = '184.193.151.24'
-        DEPLOY_USER     = 'ubuntu'
-        DEPLOY_PATH     = '/var/www/html/microservices-devops.app/devops-microservices-demo'
+        // Host port each web server publishes the frontend on; the load
+        // balancer on the Jenkins box proxies to <server>:APP_PORT.
+        APP_PORT        = '8090'
         DOMAIN            = 'learning.run.place'
         LETSENCRYPT_EMAIL = 'gurpiyar656@gmail.com'
+    }
+
+    // Build on every GitHub push (needs the repo's webhook pointed at
+    // https://jenkins.run.place/github-webhook/). Declared here so the
+    // trigger lives in git instead of only in the job's UI config.
+    triggers {
+        githubPush()
     }
 
     options {
@@ -78,6 +142,12 @@ pipeline {
                 script {
                     timedStage('Checkout') {
                         checkout scm
+                    }
+                    // Fail in seconds, not after the whole image build, if a
+                    // deploy target still has a placeholder host.
+                    def unset = deployTargets.findAll { it.host.startsWith('<') }.collect { it.name }
+                    if (params.INFRA_ACTION == 'BUILD' && unset) {
+                        error("Set the host for ${unset.join(', ')} in deployTargets at the top of the Jenkinsfile.")
                     }
                 }
             }
@@ -153,26 +223,18 @@ pipeline {
             }
         }
 
-        stage('Deploy to server') {
+        // One stage per server so each shows up separately in the stage
+        // view. They run in order; a failure in one aborts the build and
+        // the remaining servers keep running the previous version.
+        stage('Deploy to web servers') {
             when { expression { params.INFRA_ACTION == 'BUILD' } }
             steps {
                 script {
-                    timedStage('Deploy to server') {
-                        sshagent(credentials: ['deploy-server-ssh-key']) {
-                            sh """
-                                ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} 'mkdir -p ${DEPLOY_PATH}'
-                                scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/docker-compose.yml
-                                ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '\
-                                    cd ${DEPLOY_PATH} && \
-                                    export REGISTRY=${REGISTRY} && \
-                                    export IMAGE_TAG=${IMAGE_TAG} && \
-                                    export DOMAIN=${DOMAIN} && \
-                                    export LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL} && \
-                                    docker compose pull && \
-                                    docker compose up -d --remove-orphans && \
-                                    docker image prune -f \
-                                '
-                            """
+                    deployTargets.each { target ->
+                        stage("Deploy ${target.name}") {
+                            timedStage("Deploy ${target.name}") {
+                                deployTo(target)
+                            }
                         }
                     }
                 }
@@ -264,6 +326,7 @@ Stage durations: ${stageDurations}
                     ]
                     echo "Deployed build ${IMAGE_TAG}. Instance: ${details}. Stage durations: ${stageDurations}"
                     notifyGoogleChat("""✅ *${JOB_NAME}* build #${BUILD_NUMBER} succeeded.
+Deployed to: ${deployTargets.collect { it.name }.join(', ')} (https://${DOMAIN})
 Instance: ${details.id}
 Public IP: ${details.publicIp}
 Private IP: ${details.privateIp}

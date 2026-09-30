@@ -68,10 +68,14 @@
         group: "{{ deploy_user }}"
         mode: "0644"
 
-    - name: Write .env for docker compose
+    # force: false -- never overwrite an existing .env. auth-db's Postgres
+    # only takes AUTH_DB_PASSWORD when its volume is first created, so
+    # rewriting it on a live server would lock auth-service out of its DB.
+    - name: Write .env for docker compose (first run only)
       template:
         src: templates/env.j2
         dest: "{{ deploy_path }}/.env"
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
         mode: "0600"
+        force: false

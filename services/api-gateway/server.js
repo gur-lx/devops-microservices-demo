@@ -26,6 +26,8 @@ app.get('/health', (req, res) => res.json({ status: 'ok', service: 'api-gateway'
 app.get('/version', (req, res) => res.json({
   version: process.env.BUILD_VERSION || 'dev',
   domain: process.env.BUILD_DOMAIN || null,
+  // Which web server answered -- handy for watching the load balancer.
+  server: process.env.BUILD_SERVER || null,
   serviceCount: Object.keys(SERVICES).length,
 }));
 
