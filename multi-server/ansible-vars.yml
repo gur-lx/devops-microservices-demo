@@ -1,0 +1,6 @@
+# Extra vars for preparing the load-balanced web servers with the existing
+# deploy-server playbook. Passed with -e, so they override ansible/vars.yml:
+#   cd ansible && ansible-playbook playbook-deploy-server.yml -e @../multi-server/ansible-vars.yml
+target_hosts: lb_web_servers
+deploy_path: /opt/microservices-lb
+compose_src: ../multi-server/docker-compose.yml

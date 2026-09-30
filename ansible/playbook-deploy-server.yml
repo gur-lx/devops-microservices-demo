@@ -4,7 +4,9 @@
 # Jenkins' SSH key for that user, and drops the prod compose file + .env
 # into place so Jenkins can later `scp` an updated compose file and
 # `ssh ... docker compose pull && up -d`.
-- hosts: deploy_server
+# target_hosts / compose_src can be overridden with -e, e.g. by
+# multi-server/ansible-vars.yml for the load-balanced web servers.
+- hosts: "{{ target_hosts | default('deploy_server') }}"
   become: true
   vars_files:
     - vars.yml
@@ -62,7 +64,7 @@
 
     - name: Copy production docker-compose file
       copy:
-        src: ../docker-compose.prod.yml
+        src: "{{ compose_src | default('../docker-compose.prod.yml') }}"
         dest: "{{ deploy_path }}/docker-compose.yml"
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"

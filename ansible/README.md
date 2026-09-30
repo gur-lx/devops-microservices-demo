@@ -70,33 +70,17 @@ Then **Manage Jenkins → Credentials → Add Credentials**:
 Update the `Jenkinsfile`'s `DEPLOY_HOST` to the managed node's IP/alias, then
 continue with GUIDE.md section 3 (create the pipeline job + GitHub webhook).
 
-## Adding web servers (server-2 = Jenkins box, server-3 = extra EC2)
+## Load-balanced web servers (optional)
 
-The Jenkinsfile deploys to every server in `deployTargets`, one after
-another. To prepare server-2 and server-3 (Docker, the `deployer` user,
-the compose file and a `.env`), list them under `[deploy_server]` as shown
-in [inventory.example.ini](inventory.example.ini), then:
+To prepare the extra web servers for the second job
+(`multi-server/Jenkinsfile`), run the same playbook against the
+`[lb_web_servers]` group:
 
 ```bash
-ansible-playbook playbook-deploy-server.yml
+ansible-playbook playbook-deploy-server.yml -e @../multi-server/ansible-vars.yml
 ```
 
-- **SSH key**: the playbook authorizes `files/jenkins_deploy_key.pub`, and
-  it has to be the public half of the key stored in Jenkins' `deploy-server-ssh-key`
-  credential. If that credential holds a different key than the one
-  `playbook-jenkins.yml` generated, overwrite that file with the right
-  public key (e.g. copy it from server-1's `~ubuntu/.ssh/authorized_keys`)
-  and run only `playbook-deploy-server.yml`, since `site.yml` would fetch
-  the generated key again.
-- **Secrets**: `.env` gets `AUTH_DB_PASSWORD`, `JWT_SECRET` and
-  `ADMIN_PASSWORD`, generated once into `files/secrets/` (gitignored) and
-  shared by all servers, so the admin password is the same everywhere
-  (`cat files/secrets/admin_password`). An existing `.env` is never
-  overwritten.
-- **Test it** by running the pipeline once. server-2 and server-3 should
-  answer on `http://<ip>:8090/gateway-health`.
-
-Then set up the load balancer: [ci/reverse-proxy/README.md](../ci/reverse-proxy/README.md#load-balancer-for-learningrunplace-3-web-servers).
+The full setup is in [multi-server/README.md](../multi-server/README.md).
 
 ## Re-running
 

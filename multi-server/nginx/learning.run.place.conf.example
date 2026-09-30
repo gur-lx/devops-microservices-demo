@@ -1,13 +1,14 @@
 # Load balancer for learning.run.place -- an "ALB" built from the nginx
 # reverse-proxy that already fronts jenkins.run.place on the Jenkins box.
 # TLS terminates here; each web server only serves plain HTTP on :8090
-# (APP_PORT in the Jenkinsfile), reached over the VPC's private network.
+# (APP_PORT in multi-server/Jenkinsfile), reached over the VPC's private
+# network.
 #
-# Shipped as .example on purpose: nginx only loads *.conf, and a config
-# with placeholder IPs (or a missing cert) would stop nginx from starting --
-# which would take jenkins.run.place down with it. Fill in the IPs, get the
-# cert (ci/reverse-proxy/README.md, "Load balancer for learning.run.place"),
-# then copy this to learning.run.place.conf and reload nginx.
+# Shipped as .example, outside ci/reverse-proxy/conf.d/, on purpose: a
+# config with placeholder IPs (or a missing cert) would stop nginx from
+# starting -- which would take jenkins.run.place down with it. Follow
+# multi-server/README.md to fill in the IPs, get the cert, and copy this to
+# ci/reverse-proxy/conf.d/learning.run.place.conf.
 
 upstream learning_app {
     # Sticky by client IP. Each server has its own auth-db, so a session
@@ -16,7 +17,7 @@ upstream learning_app {
     # to randomly break. Drop this once the servers share one database.
     ip_hash;
 
-    # Same order as deployTargets in the Jenkinsfile. Private IPs; the
+    # Same order as deployTargets in multi-server/Jenkinsfile. Private IPs; the
     # security groups of server-1 and server-3 must allow TCP 8090 from the
     # Jenkins box. server-2 is this box itself -- use its private IP, not
     # 127.0.0.1 (that would be this nginx container).

@@ -1,0 +1,239 @@
+// Load-balanced pipeline: every GitHub push builds the images once and
+// deploys them to three web servers, one after another. Runs as its own
+// Jenkins job (Script Path: multi-server/Jenkinsfile) next to the original
+// single-server job (../Jenkinsfile), which it doesn't touch -- see
+// multi-server/README.md.
+import groovy.transform.Field
+
+// Posts a message to the Google Chat space configured via the
+// 'google-chat-webhook' Secret text credential. Never fails the build if
+// the webhook itself is down/misconfigured -- notification failures
+// shouldn't take down an otherwise-successful pipeline.
+def notifyGoogleChat(String message) {
+    withCredentials([string(credentialsId: 'google-chat-webhook', variable: 'CHAT_WEBHOOK')]) {
+        sh """
+            echo "Posting to Google Chat..."
+            curl -s -w '\\nHTTP status: %{http_code}\\n' -X POST -H 'Content-Type: application/json; charset=UTF-8' \
+              -d '{"text": "${message}"}' \
+              "\$CHAT_WEBHOOK" || true
+        """
+    }
+}
+
+// @Field (not a plain top-level `def`) so timedStage can mutate it under
+// the CPS sandbox -- same reason as in ../Jenkinsfile.
+@Field def stageDurations = [:]
+// Date instead of System.currentTimeMillis() -- the script sandbox rejects
+// raw java.lang.System calls without admin approval.
+def timedStage(String name, Closure body) {
+    def started = new Date().time
+    try {
+        body()
+    } finally {
+        stageDurations[name] = String.format('%.1fs', (new Date().time - started) / 1000.0)
+    }
+}
+
+// The web servers, deployed in this order. If one fails (deploy or health
+// check), the rest are skipped, so a bad build never gets past the first
+// server it breaks. The nginx load balancer on the Jenkins box
+// (nginx/learning.run.place.conf.example) spreads learning.run.place across
+// all three.
+//
+// `host` is the address as seen FROM the Jenkins container. server-2 is the
+// Jenkins box itself, so use its private IP there -- `localhost` would be
+// the Jenkins container, not the host.
+//
+// `path` is a directory of its own, separate from the single-server job's
+// deploy path on server-1, so the two jobs never overwrite each other's
+// compose file or .env.
+@Field def deployTargets = [
+    [name: 'server-1', host: '184.193.151.24',        user: 'ubuntu',   path: '/home/ubuntu/microservices-lb'],
+    [name: 'server-2', host: '<JENKINS_PRIVATE_IP>',  user: 'deployer', path: '/opt/microservices-lb'],
+    [name: 'server-3', host: '<SERVER_3_PRIVATE_IP>', user: 'deployer', path: '/opt/microservices-lb'],
+]
+
+// Copies this folder's compose file to one server, rolls it onto the new
+// image tag, then waits for the gateway health endpoint to answer. `docker
+// compose up -d` returns as soon as containers are created, so without the
+// health check a crash-looping build would still count as "deployed" and
+// roll on to the next server.
+def deployTo(Map target) {
+    def remote = "${target.user}@${target.host}"
+    def sshOpts = '-o StrictHostKeyChecking=no -o ConnectTimeout=15'
+    sshagent(credentials: ['deploy-server-ssh-key']) {
+        sh """
+            ssh ${sshOpts} ${remote} 'mkdir -p ${target.path}'
+            scp ${sshOpts} multi-server/docker-compose.yml ${remote}:${target.path}/docker-compose.yml
+            ssh ${sshOpts} ${remote} '\
+                cd ${target.path} && \
+                test -f .env || { echo "${target.name}: missing ${target.path}/.env (see multi-server/README.md)" >&2; exit 1; } && \
+                export REGISTRY=${env.REGISTRY} IMAGE_TAG=${env.IMAGE_TAG} DOMAIN=${env.DOMAIN} && \
+                export APP_PORT=${env.APP_PORT} SERVER_NAME=${target.name} && \
+                docker compose pull && \
+                docker compose up -d --remove-orphans && \
+                docker image prune -f \
+            '
+            ssh ${sshOpts} ${remote} '\
+                for i in \$(seq 1 30); do \
+                    if curl -fsS -o /dev/null http://localhost:${env.APP_PORT}/gateway-health; then \
+                        echo "${target.name} is healthy"; exit 0; \
+                    fi; \
+                    sleep 3; \
+                done; \
+                echo "${target.name} did not become healthy in 90s" >&2; \
+                cd ${target.path} && docker compose ps; \
+                exit 1 \
+            '
+        """
+    }
+}
+
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY        = 'docker.io/gurlx'
+        // Prefixed so this job's tags can't collide with the single-server
+        // job's plain BUILD_NUMBER tags (the two jobs count separately).
+        // No :latest push either -- that tag stays owned by ../Jenkinsfile.
+        IMAGE_TAG       = "lb-${env.BUILD_NUMBER}"
+        SERVICES        = 'frontend api-gateway user-service product-service order-service cart-service inventory-service payment-service notification-service review-service auth-service shipping-service search-service analytics-service'
+        // Host port each web server publishes the frontend on; the load
+        // balancer on the Jenkins box proxies to <server>:APP_PORT.
+        APP_PORT        = '8090'
+        DOMAIN          = 'learning.run.place'
+    }
+
+    // Build on every GitHub push (the repo's webhook already points at
+    // https://jenkins.run.place/github-webhook/).
+    triggers {
+        githubPush()
+    }
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                script {
+                    timedStage('Checkout') {
+                        checkout scm
+                    }
+                    // Fail in seconds, not after the whole image build, if a
+                    // deploy target still has a placeholder host.
+                    def unset = deployTargets.findAll { it.host.startsWith('<') }.collect { it.name }
+                    if (unset) {
+                        error("Set the host for ${unset.join(', ')} in deployTargets in multi-server/Jenkinsfile.")
+                    }
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    timedStage('SonarQube Analysis') {
+                        def scannerHome = tool 'SonarScanner'
+                        withSonarQubeEnv('SonarQube') {
+                            withEnv(["SONAR_SCANNER_OPTS=-Xmx1024m"]) {
+                                sh """
+                                    ${scannerHome}/bin/sonar-scanner \
+                                      -Dsonar.projectKey=devops-microservices-demo \
+                                      -Dsonar.projectName='DevOps Microservices Demo' \
+                                      -Dsonar.projectVersion=${IMAGE_TAG} \
+                                      -Dsonar.sources=services \
+                                      -Dsonar.exclusions=**/node_modules/**
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                script {
+                    timedStage('Quality Gate') {
+                        timeout(time: 5, unit: 'MINUTES') {
+                            waitForQualityGate abortPipeline: true
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build images') {
+            steps {
+                script {
+                    timedStage('Build images') {
+                        SERVICES.split(' ').each { svc ->
+                            sh "docker build -t ${REGISTRY}/${svc}:${IMAGE_TAG} ./services/${svc}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Push images') {
+            steps {
+                script {
+                    timedStage('Push images') {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'dockerhub-credentials',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )]) {
+                            sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                            SERVICES.split(' ').each { svc ->
+                                sh "docker push ${REGISTRY}/${svc}:${IMAGE_TAG}"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // One stage per server so each shows up separately in the stage
+        // view. They run in order; a failure in one aborts the build and
+        // the remaining servers keep running the previous version.
+        stage('Deploy to web servers') {
+            steps {
+                script {
+                    deployTargets.each { target ->
+                        stage("Deploy ${target.name}") {
+                            timedStage("Deploy ${target.name}") {
+                                deployTo(target)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                def servers = deployTargets.collect { it.name }.join(', ')
+                echo "Deployed ${IMAGE_TAG} to ${servers}. Stage durations: ${stageDurations}"
+                notifyGoogleChat("""✅ *${JOB_NAME}* build #${BUILD_NUMBER} deployed ${IMAGE_TAG} to ${servers}.
+https://${DOMAIN}
+Stage durations: ${stageDurations}
+<${BUILD_URL}|View build>""")
+            }
+        }
+        failure {
+            echo "Pipeline failed - servers after the failed stage were not deployed."
+            notifyGoogleChat("❌ *${JOB_NAME}* build #${BUILD_NUMBER} failed. Servers after the failed stage still run the previous version. <${BUILD_URL}console|View console log>")
+        }
+        always {
+            sh 'docker logout || true'
+        }
+    }
+}
