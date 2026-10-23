@@ -89,16 +89,38 @@ pipeline {
                 script {
                     timedStage('SonarQube Analysis') {
                         def scannerHome = tool 'SonarScanner'
+                        // Pass the analysis token explicitly via a Jenkins
+                        // 'Secret text' credential (id: sonarqube-token).
+                        // withSonarQubeEnv only injects SONAR_TOKEN if a token
+                        // is attached to the SonarQube *server* config; when it
+                        // isn't, the scanner gets no credentials and SonarQube
+                        // replies 401 Unauthorized. Supplying it here as well
+                        // makes auth explicit and fails early with a readable
+                        // message instead of a raw 401 deep in the scanner.
                         withSonarQubeEnv('SonarQube') {
-                            withEnv(["SONAR_SCANNER_OPTS=-Xmx1024m"]) {
-                                sh """
-                                    ${scannerHome}/bin/sonar-scanner \
-                                      -Dsonar.projectKey=devops-microservices-demo \
-                                      -Dsonar.projectName='DevOps Microservices Demo' \
-                                      -Dsonar.projectVersion=${IMAGE_TAG} \
-                                      -Dsonar.sources=services \
-                                      -Dsonar.exclusions=**/node_modules/**
-                                """
+                            withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                                withEnv(["SONAR_SCANNER_OPTS=-Xmx1024m"]) {
+                                    sh '''
+                                        if [ -z "$SONAR_TOKEN" ]; then
+                                          echo "ERROR: SONAR_TOKEN is empty. Add a 'Secret text' credential with id 'sonarqube-token' holding a valid SonarQube analysis token, and ensure that token's user has 'Execute Analysis' permission." >&2
+                                          exit 1
+                                        fi
+                                        if [ -z "$SONAR_HOST_URL" ]; then
+                                          echo "ERROR: SONAR_HOST_URL is empty. Set the Server URL on the 'SonarQube' server config in Manage Jenkins -> System." >&2
+                                          exit 1
+                                        fi
+                                    '''
+                                    sh """
+                                        ${scannerHome}/bin/sonar-scanner \
+                                          -Dsonar.projectKey=devops-microservices-demo \
+                                          -Dsonar.projectName='DevOps Microservices Demo' \
+                                          -Dsonar.projectVersion=${IMAGE_TAG} \
+                                          -Dsonar.sources=services \
+                                          -Dsonar.exclusions=**/node_modules/** \
+                                          -Dsonar.host.url=\$SONAR_HOST_URL \
+                                          -Dsonar.token=\$SONAR_TOKEN
+                                    """
+                                }
                             }
                         }
                     }
