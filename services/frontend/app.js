@@ -34,6 +34,27 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
   setTheme(nextTheme);
 });
 
+// Escape dynamic/server-provided values before injecting into innerHTML.
+// Backends keep data in memory with minimal validation, so a value like a
+// user name could contain HTML; escaping here prevents stored/reflected XSS.
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
+// Only write to the DOM when the value actually changed. The dashboard
+// re-polls health/stats/deploy-info on timers (every 8s / 30s); rewriting
+// identical text each cycle forces needless repaints that read as a flicker.
+function setText(el, value) {
+  const next = String(value);
+  if (el && el.textContent !== next) el.textContent = next;
+}
+
 function buildHealthGrid() {
   const grid = document.getElementById('health-grid');
   grid.innerHTML = Object.keys(HEALTH_ENDPOINTS).map(service => `
@@ -61,17 +82,17 @@ async function checkHealth(service, path) {
     const res = await fetch(path, { cache: 'no-store' });
     const elapsed = Math.round(performance.now() - started);
     if (!res.ok) throw new Error('bad status');
-    dot.className = 'dot dot-ok';
+    if (dot.className !== 'dot dot-ok') dot.className = 'dot dot-ok';
     card.classList.add('is-ok');
     card.classList.remove('is-down');
-    latencyEl.textContent = `${elapsed}ms`;
-    statusEl.textContent = 'healthy';
+    setText(latencyEl, `${elapsed}ms`);
+    setText(statusEl, 'healthy');
   } catch (err) {
-    dot.className = 'dot dot-down';
+    if (dot.className !== 'dot dot-down') dot.className = 'dot dot-down';
     card.classList.add('is-down');
     card.classList.remove('is-ok');
-    latencyEl.textContent = '—';
-    statusEl.textContent = 'unreachable';
+    setText(latencyEl, '—');
+    setText(statusEl, 'unreachable');
   }
 }
 
@@ -86,7 +107,7 @@ async function loadUsers() {
     const res = await fetch('/api/users', { cache: 'no-store' });
     const users = await res.json();
     count.textContent = users.length;
-    body.innerHTML = users.map(u => `<tr><td>${u.id}</td><td>${u.name}</td></tr>`).join('');
+    body.innerHTML = users.map(u => `<tr><td>${escapeHtml(u.id)}</td><td>${escapeHtml(u.name)}</td></tr>`).join('');
   } catch (err) {
     body.innerHTML = '<tr><td colspan="2" class="empty-row">could not reach user-service</td></tr>';
   }
@@ -99,7 +120,7 @@ async function loadProducts() {
     const res = await fetch('/api/products', { cache: 'no-store' });
     const products = await res.json();
     count.textContent = products.length;
-    body.innerHTML = products.map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>$${p.price.toFixed(2)}</td></tr>`).join('');
+    body.innerHTML = products.map(p => `<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.name)}</td><td>$${Number(p.price).toFixed(2)}</td></tr>`).join('');
   } catch (err) {
     body.innerHTML = '<tr><td colspan="3" class="empty-row">could not reach product-service</td></tr>';
   }
@@ -112,7 +133,7 @@ async function loadOrders() {
     const res = await fetch('/api/orders', { cache: 'no-store' });
     const orders = await res.json();
     count.textContent = orders.length;
-    body.innerHTML = orders.map(o => `<tr><td>${o.id}</td><td>${o.product}</td><td>${o.quantity}</td><td>${o.status}</td></tr>`).join('');
+    body.innerHTML = orders.map(o => `<tr><td>${escapeHtml(o.id)}</td><td>${escapeHtml(o.product)}</td><td>${escapeHtml(o.quantity)}</td><td>${escapeHtml(o.status)}</td></tr>`).join('');
   } catch (err) {
     body.innerHTML = '<tr><td colspan="4" class="empty-row">could not reach order-service</td></tr>';
   }
@@ -125,7 +146,7 @@ async function loadInventory() {
     const res = await fetch('/api/inventory', { cache: 'no-store' });
     const inventory = await res.json();
     count.textContent = inventory.length;
-    body.innerHTML = inventory.map(i => `<tr><td>${i.id}</td><td>${i.product}</td><td>${i.stock}</td></tr>`).join('');
+    body.innerHTML = inventory.map(i => `<tr><td>${escapeHtml(i.id)}</td><td>${escapeHtml(i.product)}</td><td>${escapeHtml(i.stock)}</td></tr>`).join('');
   } catch (err) {
     body.innerHTML = '<tr><td colspan="3" class="empty-row">could not reach inventory-service</td></tr>';
   }
@@ -135,13 +156,13 @@ async function loadStats() {
   try {
     const res = await fetch('/api/stats', { cache: 'no-store' });
     const stats = await res.json();
-    document.getElementById('stat-users').textContent = stats.totalUsers;
-    document.getElementById('stat-orders').textContent = stats.totalOrders;
-    document.getElementById('stat-revenue').textContent = `$${stats.totalRevenue.toFixed(2)}`;
-    document.getElementById('stat-uptime').textContent = `${stats.uptimeSeconds}s`;
+    setText(document.getElementById('stat-users'), stats.totalUsers);
+    setText(document.getElementById('stat-orders'), stats.totalOrders);
+    setText(document.getElementById('stat-revenue'), `$${Number(stats.totalRevenue).toFixed(2)}`);
+    setText(document.getElementById('stat-uptime'), `${stats.uptimeSeconds}s`);
   } catch (err) {
     ['stat-users', 'stat-orders', 'stat-revenue', 'stat-uptime'].forEach(id => {
-      document.getElementById(id).textContent = '—';
+      setText(document.getElementById(id), '—');
     });
   }
 }
@@ -334,11 +355,11 @@ async function loadDeployInfo() {
   try {
     const res = await fetch('/version', { cache: 'no-store' });
     const data = await res.json();
-    document.getElementById('deploy-build').textContent = `#${data.version}`;
-    document.getElementById('deploy-domain').textContent = data.domain || 'localhost';
-    document.getElementById('deploy-services').textContent = data.serviceCount;
+    setText(document.getElementById('deploy-build'), `#${data.version}`);
+    setText(document.getElementById('deploy-domain'), data.domain || 'localhost');
+    setText(document.getElementById('deploy-services'), data.serviceCount);
   } catch (err) {
-    document.getElementById('deploy-build').textContent = 'unreachable';
+    setText(document.getElementById('deploy-build'), 'unreachable');
   }
 }
 
