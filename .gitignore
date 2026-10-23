@@ -2,6 +2,15 @@ node_modules/
 .env
 *.log
 
+# Secrets / keys
+*.pem
+
+# Terraform state & generated files
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+
 # LaTeX build artifacts
 *.aux
 *.out
